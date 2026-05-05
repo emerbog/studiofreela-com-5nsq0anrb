@@ -21,20 +21,51 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { LayoutDashboard, CalendarDays, Users, DollarSign, Settings, Plus } from 'lucide-react'
+import {
+  LayoutDashboard,
+  CalendarDays,
+  Users,
+  DollarSign,
+  Settings,
+  Plus,
+  FileText,
+  FileSignature,
+  Lock,
+  ShieldAlert,
+} from 'lucide-react'
 import { ClientFormSheet } from './ClientFormSheet'
 import { EventFormDialog } from './EventFormDialog'
+import { useAppData } from '@/hooks/use-app-data'
+import { cn } from '@/lib/utils'
+import { PlanTier } from '@/types'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
-const navItems = [
-  { title: 'Início', url: '/', icon: LayoutDashboard },
-  { title: 'Agenda', url: '/agenda', icon: CalendarDays },
-  { title: 'Clientes', url: '/clientes', icon: Users },
-  { title: 'Financeiro', url: '/financeiro', icon: DollarSign },
-  { title: 'Configurações', url: '/configuracoes', icon: Settings },
+type NavItem = {
+  title: string
+  url: string
+  icon: any
+  minTier: PlanTier
+}
+
+const navItems: NavItem[] = [
+  { title: 'Início', url: '/', icon: LayoutDashboard, minTier: 'economy' },
+  { title: 'Agenda', url: '/agenda', icon: CalendarDays, minTier: 'economy' },
+  { title: 'Clientes', url: '/clientes', icon: Users, minTier: 'economy' },
+  { title: 'Financeiro', url: '/financeiro', icon: DollarSign, minTier: 'economy' },
+  { title: 'Orçamentos', url: '/orcamentos', icon: FileText, minTier: 'intermediate' },
+  { title: 'Contratos', url: '/contratos', icon: FileSignature, minTier: 'premium' },
+  { title: 'Configurações', url: '/configuracoes', icon: Settings, minTier: 'economy' },
 ]
+
+const tierPriority: Record<PlanTier, number> = {
+  economy: 1,
+  intermediate: 2,
+  premium: 3,
+}
 
 export function Layout() {
   const location = useLocation()
+  const { currentTier, setCurrentTier } = useAppData()
 
   const currentTitle = navItems.find((item) => item.url === location.pathname)?.title || 'Elegante'
 
@@ -51,20 +82,32 @@ export function Layout() {
             <SidebarGroup>
               <SidebarGroupContent className="mt-4">
                 <SidebarMenu>
-                  {navItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={location.pathname === item.url}
-                        tooltip={item.title}
-                      >
-                        <Link to={item.url} className="gap-3 px-4 py-6 text-[15px]">
-                          <item.icon className="w-5 h-5" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {navItems.map((item) => {
+                    const isLocked = tierPriority[currentTier] < tierPriority[item.minTier]
+                    return (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={location.pathname === item.url}
+                          tooltip={item.title}
+                        >
+                          <Link
+                            to={item.url}
+                            className={cn(
+                              'gap-3 px-4 py-6 text-[15px] group flex justify-between items-center w-full',
+                              isLocked && 'text-muted-foreground',
+                            )}
+                          >
+                            <div className="flex items-center gap-3">
+                              <item.icon className="w-5 h-5" />
+                              <span>{item.title}</span>
+                            </div>
+                            {isLocked && <Lock className="w-4 h-4 opacity-50" />}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -86,7 +129,37 @@ export function Layout() {
               <DropdownMenuContent align="start" className="w-56">
                 <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Perfil</DropdownMenuItem>
+                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1">
+                  Plano Atual
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => setCurrentTier('economy')}
+                  className="justify-between cursor-pointer"
+                >
+                  Economy{' '}
+                  {currentTier === 'economy' && (
+                    <span className="w-2 h-2 rounded-full bg-primary" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setCurrentTier('intermediate')}
+                  className="justify-between cursor-pointer"
+                >
+                  Intermediate{' '}
+                  {currentTier === 'intermediate' && (
+                    <span className="w-2 h-2 rounded-full bg-primary" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setCurrentTier('premium')}
+                  className="justify-between cursor-pointer"
+                >
+                  Premium{' '}
+                  {currentTier === 'premium' && (
+                    <span className="w-2 h-2 rounded-full bg-primary" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem>Sair</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -128,9 +201,22 @@ export function Layout() {
             </div>
           </header>
 
-          <div className="flex-1 overflow-auto p-6 lg:p-10 animate-fade-in-up">
-            <div className="max-w-6xl mx-auto">
+          <div className="flex-1 overflow-auto p-6 lg:p-10 animate-fade-in-up flex flex-col">
+            <div className="max-w-6xl mx-auto w-full flex-1">
               <Outlet />
+            </div>
+
+            <div className="mt-auto pt-10 max-w-6xl mx-auto w-full">
+              <Alert
+                variant="default"
+                className="bg-muted/40 text-muted-foreground border-border/50"
+              >
+                <ShieldAlert className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Os dados informados são armazenados temporariamente. Para persistência permanente,
+                  é necessária a integração com banco de dados.
+                </AlertDescription>
+              </Alert>
             </div>
           </div>
         </main>

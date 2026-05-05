@@ -9,6 +9,8 @@ import Index from '@/pages/Index'
 import Agenda from '@/pages/Agenda'
 import Clients from '@/pages/Clients'
 import Financial from '@/pages/Financial'
+import Quotes from '@/pages/Quotes'
+import Contracts from '@/pages/Contracts'
 import NotFound from '@/pages/NotFound'
 
 const App = () => (
@@ -23,6 +25,8 @@ const App = () => (
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/clientes" element={<Clients />} />
             <Route path="/financeiro" element={<Financial />} />
+            <Route path="/orcamentos" element={<Quotes />} />
+            <Route path="/contratos" element={<Contracts />} />
             {/* Placeholder for Configurações to avoid 404 when clicking the link */}
             <Route
               path="/configuracoes"

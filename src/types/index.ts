@@ -32,3 +32,32 @@ export type Finance = {
   dueDate: string
   status: FinanceStatus
 }
+
+export type PlanTier = 'economy' | 'intermediate' | 'premium'
+
+export type QuoteItem = {
+  id?: string
+  description: string
+  quantity: number
+  unitPrice: number
+}
+
+export type Quote = {
+  id: string
+  clientId: string
+  number: string
+  date: string
+  items: QuoteItem[]
+  total: number
+  status: 'Rascunho' | 'Enviado' | 'Aprovado' | 'Rejeitado'
+}
+
+export type Contract = {
+  id: string
+  clientId: string
+  quoteId?: string
+  number: string
+  date: string
+  content: string
+  status: 'Rascunho' | 'Enviado' | 'Assinado'
+}
