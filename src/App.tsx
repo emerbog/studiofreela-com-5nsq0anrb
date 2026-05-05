@@ -1,28 +1,42 @@
-/* Main App Component - Handles routing (using react-router-dom), query client and other providers - use this file to add all routes */
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import Index from './pages/Index'
-import NotFound from './pages/NotFound'
-import Layout from './components/Layout'
+import { AppDataProvider } from '@/hooks/use-app-data'
 
-// ONLY IMPORT AND RENDER WORKING PAGES, NEVER ADD PLACEHOLDER COMPONENTS OR PAGES IN THIS FILE
-// AVOID REMOVING ANY CONTEXT PROVIDERS FROM THIS FILE (e.g. TooltipProvider, Toaster, Sonner)
+import { Layout } from '@/components/Layout'
+import Index from '@/pages/Index'
+import Agenda from '@/pages/Agenda'
+import Clients from '@/pages/Clients'
+import Financial from '@/pages/Financial'
+import NotFound from '@/pages/NotFound'
 
 const App = () => (
   <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES MUST BE ADDED HERE */}
-        </Route>
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </TooltipProvider>
+    <AppDataProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner position="top-right" className="font-sans" />
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<Index />} />
+            <Route path="/agenda" element={<Agenda />} />
+            <Route path="/clientes" element={<Clients />} />
+            <Route path="/financeiro" element={<Financial />} />
+            {/* Placeholder for Configurações to avoid 404 when clicking the link */}
+            <Route
+              path="/configuracoes"
+              element={
+                <div className="p-8 text-center text-muted-foreground">
+                  Página de configurações em construção.
+                </div>
+              }
+            />
+          </Route>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </TooltipProvider>
+    </AppDataProvider>
   </BrowserRouter>
 )
 
