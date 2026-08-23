@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react'
 import { Client, AppEvent, Finance, PlanTier, Quote, Contract } from '@/types'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/use-auth'
 
 type AppDataContextType = {
   currentTier: PlanTier
@@ -195,8 +196,25 @@ const initialContracts: Contract[] = [
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined)
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const [currentTier, setCurrentTier] = useState<PlanTier>('economy')
+  const { user, updateProfile } = useAuth()
+  const [currentTier, setCurrentTierState] = useState<PlanTier>(
+    () => user?.plan_tier || 'intermediate',
+  )
   const [clients, setClients] = useState<Client[]>(initialClients)
+
+  // Sync tier with user profile
+  React.useEffect(() => {
+    if (user?.plan_tier && user.plan_tier !== currentTier) {
+      setCurrentTierState(user.plan_tier)
+    }
+  }, [user?.plan_tier])
+
+  const setCurrentTier = (tier: PlanTier) => {
+    setCurrentTierState(tier)
+    if (user?.id) {
+      updateProfile({ plan_tier: tier })
+    }
+  }
   const [events, setEvents] = useState<AppEvent[]>(initialEvents)
   const [finances, setFinances] = useState<Finance[]>(initialFinances)
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes)

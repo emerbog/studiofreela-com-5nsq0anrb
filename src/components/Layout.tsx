@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Sidebar,
   SidebarContent,
@@ -26,19 +26,22 @@ import {
   CalendarDays,
   Users,
   DollarSign,
-  Settings,
   Plus,
   FileText,
   FileSignature,
   Lock,
-  ShieldAlert,
+  User as UserIcon,
+  LogOut,
+  ShieldCheck,
+  ExternalLink,
 } from 'lucide-react'
 import { ClientFormSheet } from './ClientFormSheet'
 import { EventFormDialog } from './EventFormDialog'
 import { useAppData } from '@/hooks/use-app-data'
+import { useAuth } from '@/hooks/use-auth'
+import { getAvatarUrl } from '@/services/userService'
 import { cn } from '@/lib/utils'
 import { PlanTier } from '@/types'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 
 type NavItem = {
   title: string
@@ -48,13 +51,13 @@ type NavItem = {
 }
 
 const navItems: NavItem[] = [
-  { title: 'Início', url: '/', icon: LayoutDashboard, minTier: 'economy' },
+  { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, minTier: 'economy' },
   { title: 'Agenda', url: '/agenda', icon: CalendarDays, minTier: 'economy' },
   { title: 'Clientes', url: '/clientes', icon: Users, minTier: 'economy' },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign, minTier: 'economy' },
   { title: 'Orçamentos', url: '/orcamentos', icon: FileText, minTier: 'intermediate' },
   { title: 'Contratos', url: '/contratos', icon: FileSignature, minTier: 'advanced' },
-  { title: 'Configurações', url: '/configuracoes', icon: Settings, minTier: 'economy' },
+  { title: 'Meu Perfil', url: '/profile', icon: UserIcon, minTier: 'economy' },
 ]
 
 const tierPriority: Record<PlanTier, number> = {
@@ -66,44 +69,62 @@ const tierPriority: Record<PlanTier, number> = {
 
 export function Layout() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { currentTier, setCurrentTier } = useAppData()
+  const { user, logout } = useAuth()
 
-  const currentTitle = navItems.find((item) => item.url === location.pathname)?.title || 'Elegante'
+  const currentTitle =
+    navItems.find((item) => item.url === location.pathname)?.title || 'Gestão Freelance'
+
+  const handleLogout = () => {
+    logout()
+    navigate('/')
+  }
+
+  const avatarUrl = getAvatarUrl(user)
+  const initials = user?.name ? user.name.substring(0, 2).toUpperCase() : 'GF'
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background font-sans">
         <Sidebar>
           <SidebarHeader className="p-4 border-b border-sidebar-border">
-            <h2 className="text-xl font-serif italic text-sidebar-primary tracking-tight">
-              Elegante.
-            </h2>
+            <Link to="/dashboard" className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center font-serif text-base font-bold shadow-xs">
+                G
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-serif font-bold text-sidebar-foreground tracking-tight">
+                  Gestão Freelance
+                </span>
+                <span className="text-[10px] text-sidebar-foreground/60 uppercase tracking-widest font-medium">
+                  Elegante
+                </span>
+              </div>
+            </Link>
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
-              <SidebarGroupContent className="mt-4">
+              <SidebarGroupContent className="mt-3">
                 <SidebarMenu>
                   {navItems.map((item) => {
                     const isLocked = tierPriority[currentTier] < tierPriority[item.minTier]
+                    const isActive = location.pathname === item.url
                     return (
                       <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton
-                          asChild
-                          isActive={location.pathname === item.url}
-                          tooltip={item.title}
-                        >
+                        <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
                           <Link
                             to={item.url}
                             className={cn(
-                              'gap-3 px-4 py-6 text-[15px] group flex justify-between items-center w-full',
-                              isLocked && 'text-muted-foreground',
+                              'gap-3 px-3.5 py-5 text-sm group flex justify-between items-center w-full transition-colors',
+                              isLocked && 'text-muted-foreground/70',
                             )}
                           >
                             <div className="flex items-center gap-3">
-                              <item.icon className="w-5 h-5" />
-                              <span>{item.title}</span>
+                              <item.icon className="w-4 h-4" />
+                              <span className="font-medium">{item.title}</span>
                             </div>
-                            {isLocked && <Lock className="w-4 h-4 opacity-50" />}
+                            {isLocked && <Lock className="w-3.5 h-3.5 opacity-50" />}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -112,56 +133,102 @@ export function Layout() {
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
+
+            <SidebarGroup className="mt-auto">
+              <SidebarGroupContent>
+                <div className="p-3 bg-sidebar-accent/50 rounded-lg border border-sidebar-border/50 text-xs text-sidebar-foreground/80 space-y-2">
+                  <div className="flex items-center justify-between font-medium">
+                    <span>Plano Ativo</span>
+                    <span className="capitalize text-sidebar-primary font-semibold text-[11px] bg-sidebar-primary/10 px-2 py-0.5 rounded">
+                      {currentTier}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-sidebar-foreground/60 leading-relaxed">
+                    Alterne ou consulte planos na página pública ou no menu da sua conta.
+                  </p>
+                  <Link
+                    to="/"
+                    target="_blank"
+                    className="inline-flex items-center gap-1 text-[11px] text-sidebar-primary hover:underline pt-1"
+                  >
+                    Ver landing page <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
+              </SidebarGroupContent>
+            </SidebarGroup>
           </SidebarContent>
-          <SidebarFooter className="p-4">
+
+          <SidebarFooter className="p-4 border-t border-sidebar-border">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <div className="flex items-center gap-3 cursor-pointer hover:bg-sidebar-accent p-2 rounded-md transition-colors">
-                  <Avatar className="w-8 h-8 border border-sidebar-border">
-                    <AvatarImage src="https://img.usecurling.com/ppl/thumbnail?gender=male&seed=1" />
-                    <AvatarFallback>FL</AvatarFallback>
+                <div className="flex items-center gap-3 cursor-pointer hover:bg-sidebar-accent p-2 rounded-lg transition-colors w-full">
+                  <Avatar className="w-9 h-9 border border-sidebar-border shrink-0">
+                    <AvatarImage src={avatarUrl} alt={user?.name} className="object-cover" />
+                    <AvatarFallback className="font-serif text-xs font-semibold">
+                      {initials}
+                    </AvatarFallback>
                   </Avatar>
-                  <div className="flex flex-col text-sm">
-                    <span className="font-medium text-sidebar-foreground">Felipe</span>
-                    <span className="text-xs text-sidebar-foreground/60">Freelancer</span>
+                  <div className="flex flex-col text-left min-w-0 flex-1">
+                    <span className="font-medium text-sidebar-foreground text-sm truncate">
+                      {user?.name || 'Freelancer'}
+                    </span>
+                    <span className="text-xs text-sidebar-foreground/60 truncate">
+                      {user?.email || 'meu@email.com'}
+                    </span>
                   </div>
                 </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+              <DropdownMenuContent align="start" className="w-56" side="top">
+                <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
+                  Conectado como{' '}
+                  <strong className="text-foreground block truncate">
+                    {user?.name || user?.email}
+                  </strong>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
+                  <UserIcon className="w-4 h-4 mr-2" />
+                  Meu Perfil & Senha
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1">
-                  Plano Atual
+                  Trocar Plano (Simulação)
                 </DropdownMenuLabel>
                 <DropdownMenuItem
                   onClick={() => setCurrentTier('economy')}
-                  className="justify-between cursor-pointer"
+                  className="justify-between cursor-pointer text-xs"
                 >
-                  Economy{' '}
+                  Plano Economy (Free){' '}
                   {currentTier === 'economy' && (
                     <span className="w-2 h-2 rounded-full bg-primary" />
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setCurrentTier('intermediate')}
-                  className="justify-between cursor-pointer"
+                  className="justify-between cursor-pointer text-xs"
                 >
-                  Intermediate{' '}
+                  Plano Intermediate (R$ 29,90){' '}
                   {currentTier === 'intermediate' && (
                     <span className="w-2 h-2 rounded-full bg-primary" />
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setCurrentTier('advanced')}
-                  className="justify-between cursor-pointer"
+                  className="justify-between cursor-pointer text-xs"
                 >
-                  Advanced{' '}
+                  Plano Advanced (R$ 49,90){' '}
                   {(currentTier === 'advanced' || currentTier === 'premium') && (
                     <span className="w-2 h-2 rounded-full bg-primary" />
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Sair</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sair da Conta
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarFooter>
@@ -171,12 +238,18 @@ export function Layout() {
           <header className="h-16 flex items-center justify-between px-6 lg:px-10 border-b bg-background/95 backdrop-blur z-10 sticky top-0">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="md:hidden" />
-              <h1 className="text-xl font-serif font-semibold tracking-tight">{currentTitle}</h1>
+              <h1 className="text-xl font-serif font-semibold tracking-tight text-foreground">
+                {currentTitle}
+              </h1>
             </div>
+
             <div className="flex items-center gap-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm">
+                  <button
+                    aria-label="Criar novo item"
+                    className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+                  >
                     <Plus className="w-5 h-5" />
                   </button>
                 </DropdownMenuTrigger>
@@ -199,25 +272,53 @@ export function Layout() {
                   />
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    aria-label="Menu do usuário"
+                    className="flex items-center gap-2 p-1 rounded-full hover:bg-muted/80 transition-colors focus:outline-none"
+                  >
+                    <Avatar className="w-8 h-8 border border-border">
+                      <AvatarImage src={avatarUrl} alt={user?.name} className="object-cover" />
+                      <AvatarFallback className="font-serif text-xs font-semibold">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
+                    Logado como{' '}
+                    <strong className="text-foreground block truncate">
+                      {user?.name || user?.email}
+                    </strong>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
+                    <UserIcon className="w-4 h-4 mr-2" />
+                    Meu Perfil
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/')} className="cursor-pointer">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Ver Landing Page
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sair da Conta
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </header>
 
           <div className="flex-1 overflow-auto p-6 lg:p-10 animate-fade-in-up flex flex-col">
             <div className="max-w-6xl mx-auto w-full flex-1">
               <Outlet />
-            </div>
-
-            <div className="mt-auto pt-10 max-w-6xl mx-auto w-full">
-              <Alert
-                variant="default"
-                className="bg-muted/40 text-muted-foreground border-border/50"
-              >
-                <ShieldAlert className="h-4 w-4" />
-                <AlertDescription className="text-xs">
-                  Os dados informados são armazenados temporariamente. Para persistência permanente,
-                  é necessária a integração com banco de dados.
-                </AlertDescription>
-              </Alert>
             </div>
           </div>
         </main>

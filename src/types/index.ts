@@ -35,6 +35,19 @@ export type Finance = {
 
 export type PlanTier = 'economy' | 'intermediate' | 'advanced' | 'premium'
 
+export type UserProfile = {
+  id: string
+  email: string
+  name: string
+  avatar?: string
+  phone?: string
+  profession?: string
+  address?: string
+  plan_tier?: PlanTier
+  created?: string
+  updated?: string
+}
+
 export type QuoteItem = {
   id?: string
   description: string
