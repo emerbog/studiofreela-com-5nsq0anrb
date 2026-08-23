@@ -11,9 +11,12 @@ import {
   ShieldCheck,
   FileCheck2,
   Share2,
+  Loader2,
+  FileDown,
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { exportContractToPdf, generateContractPdfFilename } from '@/lib/pdf-export'
 
 interface ContractDocumentViewerProps {
   contract?: Contract | null
@@ -48,11 +51,41 @@ export function ContractDocumentViewer({
   showActions = true,
 }: ContractDocumentViewerProps) {
   const [copied, setCopied] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   const data = propFormData || contract?.formData
   const number = contractNumber || contract?.number || 'CTR-NOVO'
   const date = contractDate || contract?.date || new Date().toISOString()
   const contractStatus = contract?.status || status
+
+  const handleExportPdf = async () => {
+    if (!data) {
+      toast.error('Dados do contrato indisponíveis para exportação.')
+      return
+    }
+
+    const filename = generateContractPdfFilename(data.clientName, number)
+    setIsExporting(true)
+    const toastId = toast.loading(`Preparando PDF: ${filename}...`)
+
+    try {
+      await exportContractToPdf(data, number, date, contractStatus)
+      toast.success(
+        `PDF preparado com sucesso (${filename})! Selecione "Salvar como PDF" na janela de impressão.`,
+        {
+          id: toastId,
+          duration: 5000,
+        },
+      )
+    } catch (err) {
+      console.error('Erro ao exportar PDF:', err)
+      toast.error('Não foi possível gerar o PDF. Tente novamente ou use o botão Imprimir.', {
+        id: toastId,
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   const handlePrint = () => {
     window.print()
@@ -367,8 +400,27 @@ Observação: este é um modelo contratual de uso geral. Dependendo do serviço 
               )}
               {copied ? 'Copiado' : 'Copiar Texto'}
             </Button>
-            <Button variant="default" size="sm" onClick={handlePrint} className="gap-2 shadow-sm">
-              <Printer className="w-4 h-4" /> Imprimir / Salvar PDF
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleExportPdf}
+              disabled={isExporting}
+              className="gap-2 shadow-sm bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
+            >
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 animate-spin text-accent" />
+              ) : (
+                <FileDown className="w-4 h-4 text-accent" />
+              )}
+              {isExporting ? 'Exportando PDF...' : 'Exportar PDF'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrint}
+              className="gap-2 hidden sm:inline-flex"
+            >
+              <Printer className="w-4 h-4" /> Imprimir
             </Button>
           </div>
         </div>

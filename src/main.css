@@ -100,15 +100,22 @@
   }
 
   @media print {
+    @page {
+      margin: 15mm 15mm 18mm 15mm;
+      size: A4 portrait;
+    }
     body {
       background: white !important;
       color: black !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     aside,
     header,
     nav,
     button,
-    [role='dialog'] > button {
+    [role='dialog'] > button,
+    .print\\:hidden {
       display: none !important;
     }
     .contract-print-area {
@@ -118,6 +125,15 @@
       max-width: 100% !important;
       width: 100% !important;
       margin: 0 !important;
+    }
+    .contract-print-area table,
+    .contract-print-area blockquote,
+    .contract-print-area .signatures-section {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    .contract-print-area hr {
+      border-color: #cbd5e1 !important;
     }
   }
 

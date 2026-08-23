@@ -47,7 +47,7 @@ const quoteItemSchema = z.object({
   unitPrice: z.number().min(0, 'Preço deve ser maior ou igual a 0'),
 })
 
-const quoteSchema: z.ZodType<QuoteFormValues> = z.object({
+const quoteSchema = z.object({
   clientId: z.string().min(1, 'Selecione um cliente'),
   status: z.enum(['Rascunho', 'Enviado', 'Aprovado', 'Rejeitado']),
   items: z.array(quoteItemSchema).min(1, 'Adicione pelo menos um item'),
@@ -58,7 +58,7 @@ export function QuoteFormSheet({ triggerAsChild }: { triggerAsChild: React.React
   const { clients, addQuote } = useAppData()
 
   const form = useForm<QuoteFormValues>({
-    resolver: zodResolver(quoteSchema),
+    resolver: zodResolver(quoteSchema) as any,
     defaultValues: {
       clientId: '',
       status: 'Rascunho',
