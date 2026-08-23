@@ -99,6 +99,28 @@
     @apply bg-card rounded-xl border border-border/50 shadow-elegant transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
   }
 
+  @media print {
+    body {
+      background: white !important;
+      color: black !important;
+    }
+    aside,
+    header,
+    nav,
+    button,
+    [role='dialog'] > button {
+      display: none !important;
+    }
+    .contract-print-area {
+      box-shadow: none !important;
+      border: none !important;
+      padding: 0 !important;
+      max-width: 100% !important;
+      width: 100% !important;
+      margin: 0 !important;
+    }
+  }
+
   .text-heading {
     @apply font-serif tracking-tight;
   }

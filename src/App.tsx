@@ -14,7 +14,7 @@ import Contracts from '@/pages/Contracts'
 import NotFound from '@/pages/NotFound'
 
 const App = () => (
-  <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
+  <BrowserRouter>
     <AppDataProvider>
       <TooltipProvider>
         <Toaster />

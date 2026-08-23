@@ -53,13 +53,14 @@ const navItems: NavItem[] = [
   { title: 'Clientes', url: '/clientes', icon: Users, minTier: 'economy' },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign, minTier: 'economy' },
   { title: 'Orçamentos', url: '/orcamentos', icon: FileText, minTier: 'intermediate' },
-  { title: 'Contratos', url: '/contratos', icon: FileSignature, minTier: 'premium' },
+  { title: 'Contratos', url: '/contratos', icon: FileSignature, minTier: 'advanced' },
   { title: 'Configurações', url: '/configuracoes', icon: Settings, minTier: 'economy' },
 ]
 
 const tierPriority: Record<PlanTier, number> = {
   economy: 1,
   intermediate: 2,
+  advanced: 3,
   premium: 3,
 }
 
@@ -151,11 +152,11 @@ export function Layout() {
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => setCurrentTier('premium')}
+                  onClick={() => setCurrentTier('advanced')}
                   className="justify-between cursor-pointer"
                 >
-                  Premium{' '}
-                  {currentTier === 'premium' && (
+                  Advanced{' '}
+                  {(currentTier === 'advanced' || currentTier === 'premium') && (
                     <span className="w-2 h-2 rounded-full bg-primary" />
                   )}
                 </DropdownMenuItem>

@@ -31,19 +31,27 @@ import {
 } from '@/components/ui/form'
 import { Plus, Trash2 } from 'lucide-react'
 
+type QuoteFormValues = {
+  clientId: string
+  status: 'Rascunho' | 'Enviado' | 'Aprovado' | 'Rejeitado'
+  items: {
+    description: string
+    quantity: number
+    unitPrice: number
+  }[]
+}
+
 const quoteItemSchema = z.object({
   description: z.string().min(1, 'Descrição é obrigatória'),
-  quantity: z.coerce.number().min(1, 'Quantidade mínima é 1'),
-  unitPrice: z.coerce.number().min(0, 'Preço deve ser maior ou igual a 0'),
+  quantity: z.number().min(1, 'Quantidade mínima é 1'),
+  unitPrice: z.number().min(0, 'Preço deve ser maior ou igual a 0'),
 })
 
-const quoteSchema = z.object({
+const quoteSchema: z.ZodType<QuoteFormValues> = z.object({
   clientId: z.string().min(1, 'Selecione um cliente'),
   status: z.enum(['Rascunho', 'Enviado', 'Aprovado', 'Rejeitado']),
   items: z.array(quoteItemSchema).min(1, 'Adicione pelo menos um item'),
 })
-
-type QuoteFormValues = z.infer<typeof quoteSchema>
 
 export function QuoteFormSheet({ triggerAsChild }: { triggerAsChild: React.ReactNode }) {
   const [open, setOpen] = useState(false)
@@ -165,8 +173,12 @@ export function QuoteFormSheet({ triggerAsChild }: { triggerAsChild: React.React
                             <FormItem>
                               <FormLabel className="text-xs text-muted-foreground">Qtd</FormLabel>
                               <FormControl>
-                                <Input type="number" {...field} />
-                              </FormControl>
+                                <Input
+                                  type="number"
+                                  {...field}
+                                  onChange={(e) => field.onChange(Number(e.target.value))}
+                                />
+                              </FormControl>{' '}
                               <FormMessage />
                             </FormItem>
                           )}
@@ -182,8 +194,13 @@ export function QuoteFormSheet({ triggerAsChild }: { triggerAsChild: React.React
                                 Valor Unit. (R$)
                               </FormLabel>
                               <FormControl>
-                                <Input type="number" step="0.01" {...field} />
-                              </FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  {...field}
+                                  onChange={(e) => field.onChange(Number(e.target.value))}
+                                />
+                              </FormControl>{' '}
                               <FormMessage />
                             </FormItem>
                           )}
