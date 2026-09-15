@@ -1,7 +1,15 @@
 import { useAppData } from '@/hooks/use-app-data'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { formatCurrency, formatShortDate, formatDate } from '@/lib/formatters'
-import { CalendarDays, Users, DollarSign, ArrowRight, CheckCircle2, Clock } from 'lucide-react'
+import {
+  CalendarDays,
+  Calendar as CalendarIcon,
+  Users,
+  DollarSign,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,7 +32,7 @@ export default function Index() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-2">
-        <h2 className="text-3xl text-heading font-semibold">Visão Geral</h2>
+        <h1 className="text-3xl font-serif text-heading font-semibold">Visão Geral</h1>
         <p className="text-muted-foreground">
           Bem-vindo de volta. Aqui está o resumo do seu negócio.
         </p>
@@ -125,7 +133,16 @@ export default function Index() {
               )
             })}
             {upcomingEvents.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">Agenda livre.</p>
+              <div className="text-center py-8 px-4 rounded-lg border border-dashed border-border/60 bg-muted/10">
+                <CalendarIcon className="w-8 h-8 text-muted-foreground/60 mx-auto mb-2" />
+                <p className="text-sm font-medium text-foreground">Agenda livre</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Nenhum compromisso ou evento agendado para os próximos dias.
+                </p>
+                <Button size="sm" variant="outline" asChild className="mt-3 text-xs gap-1.5">
+                  <Link to="/agenda">Agendar compromisso</Link>
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -137,49 +154,62 @@ export default function Index() {
             <CardDescription>Últimas movimentações no sistema.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
-              {finances
-                .filter((f) => f.status === 'Pago')
-                .slice(0, 3)
-                .map((f) => (
+            {finances.filter((f) => f.status === 'Pago').length === 0 && clients.length === 0 ? (
+              <div className="text-center py-8 px-4 rounded-lg border border-dashed border-border/60 bg-muted/10">
+                <CheckCircle2 className="w-8 h-8 text-muted-foreground/60 mx-auto mb-2" />
+                <p className="text-sm font-medium text-foreground">Sem atividades recentes</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Seus clientes cadastrados e pagamentos confirmados serão listados aqui.
+                </p>
+                <Button size="sm" variant="outline" asChild className="mt-3 text-xs gap-1.5">
+                  <Link to="/clientes">Cadastrar primeiro cliente</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
+                {finances
+                  .filter((f) => f.status === 'Pago')
+                  .slice(0, 3)
+                  .map((f) => (
+                    <div
+                      key={f.id}
+                      className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
+                    >
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-background bg-accent text-accent-foreground shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10">
+                        <CheckCircle2 className="w-5 h-5" />
+                      </div>
+                      <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-4 rounded-xl border border-border/50 shadow-sm">
+                        <div className="flex items-center justify-between space-x-2 mb-1">
+                          <div className="font-medium text-sm text-primary">Pagamento Recebido</div>
+                          <time className="text-xs text-muted-foreground">
+                            {formatShortDate(f.dueDate)}
+                          </time>
+                        </div>
+                        <div className="text-sm text-muted-foreground">{f.title}</div>
+                      </div>
+                    </div>
+                  ))}
+                {clients.slice(0, 2).map((c) => (
                   <div
-                    key={f.id}
+                    key={c.id}
                     className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
                   >
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-background bg-accent text-accent-foreground shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10">
-                      <CheckCircle2 className="w-5 h-5" />
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-background bg-secondary text-secondary-foreground shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10">
+                      <Users className="w-5 h-5" />
                     </div>
                     <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-4 rounded-xl border border-border/50 shadow-sm">
                       <div className="flex items-center justify-between space-x-2 mb-1">
-                        <div className="font-medium text-sm text-primary">Pagamento Recebido</div>
+                        <div className="font-medium text-sm text-primary">Novo Cliente</div>
                         <time className="text-xs text-muted-foreground">
-                          {formatShortDate(f.dueDate)}
+                          {formatShortDate(c.createdAt)}
                         </time>
                       </div>
-                      <div className="text-sm text-muted-foreground">{f.title}</div>
+                      <div className="text-sm text-muted-foreground">{c.name} adicionado.</div>
                     </div>
                   </div>
                 ))}
-              {clients.slice(0, 2).map((c) => (
-                <div
-                  key={c.id}
-                  className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
-                >
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-background bg-secondary text-secondary-foreground shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-4 rounded-xl border border-border/50 shadow-sm">
-                    <div className="flex items-center justify-between space-x-2 mb-1">
-                      <div className="font-medium text-sm text-primary">Novo Cliente</div>
-                      <time className="text-xs text-muted-foreground">
-                        {formatShortDate(c.createdAt)}
-                      </time>
-                    </div>
-                    <div className="text-sm text-muted-foreground">{c.name} adicionado.</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

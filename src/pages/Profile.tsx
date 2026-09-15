@@ -227,7 +227,7 @@ export default function Profile() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl text-heading font-semibold font-serif">Meu Perfil</h2>
+          <h1 className="text-3xl text-heading font-semibold font-serif">Meu Perfil</h1>
           <p className="text-muted-foreground text-sm">
             Gerencie seus dados profissionais, informações de contato e segurança da conta.
           </p>
@@ -275,9 +275,9 @@ export default function Profile() {
 
             <div className="flex-1 text-center sm:text-left space-y-1">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <h3 className="text-xl font-bold font-serif text-foreground">
+                <h2 className="text-xl font-bold font-serif text-foreground">
                   {name || 'Usuário'}
-                </h3>
+                </h2>
                 <Badge variant="secondary" className="w-fit mx-auto sm:mx-0 font-normal">
                   <Sparkles className="w-3 h-3 mr-1 text-primary" />
                   {planLabels[user?.plan_tier || 'economy'] || 'Plano Economy'}

@@ -3,6 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { useAppData } from '@/hooks/use-app-data'
+import { useAuth } from '@/hooks/use-auth'
 import { Contract, ContractFormData } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -150,6 +151,7 @@ export function InteractiveContractEditor({
   onCancel,
 }: InteractiveContractEditorProps) {
   const { clients, quotes, addContract } = useAppData()
+  const { user } = useAuth()
 
   const defaultValues: InteractiveContractValues = {
     clientId: initialContract?.clientId || initialClientId || clients[0]?.id || '',
@@ -164,21 +166,22 @@ export function InteractiveContractEditor({
     clientEmail: initialContract?.formData?.clientEmail || '',
     clientPhone: initialContract?.formData?.clientPhone || '',
 
-    // Contratado
-    contractorName: initialContract?.formData?.contractorName || 'Felipe Freelancer',
-    contractorCpf: initialContract?.formData?.contractorCpf || '123.456.789-00',
-    contractorRg: initialContract?.formData?.contractorRg || '12.345.678-9 SSP/SP',
-    contractorAddress:
-      initialContract?.formData?.contractorAddress || 'Rua Augusta, 500 - São Paulo/SP',
+    // Contratado (Preenchido com o perfil do usuário logado se existir)
+    contractorName: initialContract?.formData?.contractorName || user?.name || '',
+    contractorCpf: initialContract?.formData?.contractorCpf || '',
+    contractorRg: initialContract?.formData?.contractorRg || '',
+    contractorAddress: initialContract?.formData?.contractorAddress || user?.address || '',
     contractorProfession:
-      initialContract?.formData?.contractorProfession || 'Prestador de Serviços / Desenvolvedor',
-    contractorEmail: initialContract?.formData?.contractorEmail || 'felipe@freelance.com',
-    contractorPhone: initialContract?.formData?.contractorPhone || '(11) 98765-4321',
+      initialContract?.formData?.contractorProfession ||
+      user?.profession ||
+      'Prestador de Serviços',
+    contractorEmail: initialContract?.formData?.contractorEmail || user?.email || '',
+    contractorPhone: initialContract?.formData?.contractorPhone || user?.phone || '',
 
     // Cláusula 1 - Objeto
     serviceScope:
       initialContract?.formData?.serviceScope ||
-      'Prestação de serviços profissionais de design, desenvolvimento e implantação de soluções digitais conforme especificações acordadas entre as partes.',
+      'Prestação de serviços profissionais conforme especificações acordadas entre as partes.',
 
     // Cláusula 2 - Prazo
     startDate: initialContract?.formData?.startDate || new Date().toISOString().slice(0, 10),
@@ -195,36 +198,36 @@ export function InteractiveContractEditor({
           }))
         : [
             {
-              description: 'Etapa 1: Planejamento, arquitetura e layout inicial',
+              description: 'Etapa 1: Planejamento, alinhamento de briefing e especificações',
               date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
             },
             {
-              description: 'Etapa 2: Desenvolvimento da interface e funcionalidades principais',
+              description: 'Etapa 2: Execução dos serviços e apresentação preliminar',
               date: new Date(Date.now() + 86400000 * 15).toISOString().slice(0, 10),
             },
             {
-              description: 'Etapa 3: Integrações, relatórios e refinamentos',
+              description: 'Etapa 3: Ajustes e validação final',
               date: new Date(Date.now() + 86400000 * 22).toISOString().slice(0, 10),
             },
             {
-              description: 'Etapa 4: Homologação final, testes e entrega dos arquivos finais',
+              description: 'Etapa 4: Entrega dos arquivos e finalização do projeto',
               date: new Date(Date.now() + 86400000 * 30).toISOString().slice(0, 10),
             },
           ],
     acceptanceDays: Number(initialContract?.formData?.acceptanceDays) || 5,
 
     // Cláusula 4 - Valor e Forma de Cobrança
-    totalValue: Number(initialContract?.formData?.totalValue) || 3500,
+    totalValue: Number(initialContract?.formData?.totalValue) || 1000,
     billingType: initialContract?.formData?.billingType || 'fixed',
     billingTypeOther: initialContract?.formData?.billingTypeOther || '',
 
     // Cláusula 5 - Forma de Pagamento e Dados Bancários
     paymentMethod: initialContract?.formData?.paymentMethod || 'pix',
     paymentMethodOther: initialContract?.formData?.paymentMethodOther || '',
-    bankName: initialContract?.formData?.bankName || 'Nubank (260)',
-    bankAgency: initialContract?.formData?.bankAgency || '0001',
-    bankAccount: initialContract?.formData?.bankAccount || '1234567-8',
-    pixKey: initialContract?.formData?.pixKey || 'felipe@freelance.com',
+    bankName: initialContract?.formData?.bankName || '',
+    bankAgency: initialContract?.formData?.bankAgency || '',
+    bankAccount: initialContract?.formData?.bankAccount || '',
+    pixKey: initialContract?.formData?.pixKey || user?.email || '',
     paymentSchedule:
       initialContract?.formData?.paymentSchedule &&
       initialContract.formData.paymentSchedule.length > 0
@@ -233,9 +236,9 @@ export function InteractiveContractEditor({
             date: p.date,
           }))
         : [
-            { amount: 1750, date: new Date().toISOString().slice(0, 10) },
+            { amount: 500, date: new Date().toISOString().slice(0, 10) },
             {
-              amount: 1750,
+              amount: 500,
               date: new Date(Date.now() + 86400000 * 30).toISOString().slice(0, 10),
             },
           ],
@@ -250,12 +253,12 @@ export function InteractiveContractEditor({
 
     // Cláusula 11 - LGPD
     dataController: initialContract?.formData?.dataController || '',
-    dataOperator: initialContract?.formData?.dataOperator || 'Felipe Freelancer',
+    dataOperator: initialContract?.formData?.dataOperator || user?.name || '',
 
     // Cláusula 12 - Propriedade Intelectual
     intellectualPropertyMaterials:
       initialContract?.formData?.intellectualPropertyMaterials ||
-      'Todo o código-fonte, layout visual, documentação técnica, arquivos editáveis e materiais digitais desenvolvidos especificamente no escopo deste contrato.',
+      'Todo o material, layout visual, documentação técnica e arquivos digitais desenvolvidos no escopo deste contrato.',
     portfolioPermission: initialContract?.formData?.portfolioPermission || 'allowed',
 
     // Cláusula 14 - Rescisão
@@ -265,16 +268,16 @@ export function InteractiveContractEditor({
     generalPenaltyPercent: Number(initialContract?.formData?.generalPenaltyPercent) || 10,
 
     // Cláusula 16 - Foro
-    forumCity: initialContract?.formData?.forumCity || 'São Paulo/SP',
+    forumCity: initialContract?.formData?.forumCity || '',
 
     // Assinaturas
-    signatureLocation: initialContract?.formData?.signatureLocation || 'São Paulo/SP',
+    signatureLocation: initialContract?.formData?.signatureLocation || '',
     signatureDate:
       initialContract?.formData?.signatureDate || new Date().toISOString().slice(0, 10),
-    witness1Name: initialContract?.formData?.witness1Name || 'Mariana Souza',
-    witness1Cpf: initialContract?.formData?.witness1Cpf || '111.222.333-44',
-    witness2Name: initialContract?.formData?.witness2Name || 'Roberto Lima',
-    witness2Cpf: initialContract?.formData?.witness2Cpf || '555.666.777-88',
+    witness1Name: initialContract?.formData?.witness1Name || '',
+    witness1Cpf: initialContract?.formData?.witness1Cpf || '',
+    witness2Name: initialContract?.formData?.witness2Name || '',
+    witness2Cpf: initialContract?.formData?.witness2Cpf || '',
   }
 
   const form = useForm<InteractiveContractValues>({

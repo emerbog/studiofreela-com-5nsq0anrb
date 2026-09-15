@@ -81,6 +81,9 @@ const App = () => (
               <Route path="/configuracoes" element={<Navigate to="/profile" replace />} />
             </Route>
 
+            {/* Rota 404 e fallback para rotas inexistentes */}
+            <Route path="/not-found" element={<NotFound />} />
+            <Route path="/404" element={<NotFound />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </TooltipProvider>

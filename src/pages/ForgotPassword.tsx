@@ -102,7 +102,7 @@ export default function ForgotPassword() {
         </div>
         <Card className="border-border/70 shadow-lg bg-card">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl font-serif">Recuperar Senha</CardTitle>
+            <h1 className="text-xl font-serif font-semibold text-foreground">Recuperar Senha</h1>
             <CardDescription className="text-xs">
               Informe seu e-mail cadastrado para enviarmos o link de redefinição
             </CardDescription>

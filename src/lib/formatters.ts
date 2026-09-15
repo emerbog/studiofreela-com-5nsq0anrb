@@ -5,17 +5,20 @@ export const formatCurrency = (value: number) => {
   }).format(value)
 }
 
-export const formatDate = (dateString: string) => {
+export const formatDate = (dateInput: string | Date) => {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
-  }).format(new Date(dateString))
+  }).format(date)
 }
 
-export const formatShortDate = (dateString: string) => {
+export const formatShortDate = (dateInput: string | Date) => {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
     month: 'short',
-  }).format(new Date(dateString))
+    year: 'numeric',
+  }).format(date)
 }

@@ -144,16 +144,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       toast.success('Autenticação com Google concluída!')
       return { success: true }
     } catch (err: any) {
+      // Se a janela popup for fechada pelo usuário ou cancelada
+      const isCancelled =
+        err?.isAbort ||
+        err?.message?.toLowerCase().includes('abort') ||
+        err?.message?.toLowerCase().includes('cancel') ||
+        err?.message?.toLowerCase().includes('closed')
+
+      if (isCancelled) {
+        toast.info('Login cancelado', {
+          description: 'A janela de autenticação com o Google foi fechada.',
+        })
+        return { success: false, error: 'Login cancelado pelo usuário.' }
+      }
+
+      // Provedor Google ainda não configurado ou erro 400 de provider
+      const errStr =
+        `${err?.message || ''} ${err?.response?.message || ''} ${err?.status || ''}`.toLowerCase()
       const isMissingConfig =
         err?.status === 400 ||
-        err?.message?.includes('provider') ||
-        err?.message?.includes('OAuth') ||
-        err?.response?.message?.includes('provider')
-      const message = isMissingConfig
-        ? 'O login com Google está aguardando as credenciais de produção (Client ID e Secret). Por gentileza, acesse com seu e-mail e senha cadastrados.'
-        : err?.response?.message || err?.message || 'Falha ao autenticar com Google.'
-      toast.error('Login com Google', { description: message })
-      return { success: false, error: message }
+        err?.status === 404 ||
+        errStr.includes('provider') ||
+        errStr.includes('oauth') ||
+        errStr.includes('missing') ||
+        errStr.includes('failed to authenticate')
+
+      const friendlyMessage = isMissingConfig
+        ? 'O login com Google ainda está aguardando as chaves de integração do projeto. Por gentileza, entre com seu e-mail e senha cadastrados.'
+        : err?.response?.message ||
+          err?.message ||
+          'Não foi possível conectar com o Google no momento.'
+
+      toast.error('Acesso com Google', {
+        description: friendlyMessage,
+        duration: 5000,
+      })
+      return { success: false, error: friendlyMessage }
     }
   }
 

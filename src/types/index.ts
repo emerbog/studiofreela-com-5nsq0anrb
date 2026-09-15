@@ -25,8 +25,8 @@ export type FinanceStatus = 'Pago' | 'Pendente' | 'Atrasado'
 
 export type Finance = {
   id: string
-  eventId: string
-  clientId: string
+  eventId?: string
+  clientId?: string
   title: string
   value: number
   dueDate: string

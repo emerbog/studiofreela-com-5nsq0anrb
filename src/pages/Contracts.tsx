@@ -51,7 +51,7 @@ export default function Contracts() {
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent font-medium text-xs mb-3">
           <Sparkles className="w-3.5 h-3.5" /> Exclusivo Plano Advanced
         </div>
-        <h2 className="text-3xl font-serif font-semibold mb-3">Gerador Interativo de Contratos</h2>
+        <h1 className="text-3xl font-serif font-semibold mb-3">Gerador Interativo de Contratos</h1>
         <p className="text-muted-foreground max-w-md mb-8 leading-relaxed">
           Preencha modelos jurídicos de prestação de serviços freelancer com campos dinâmicos,
           cálculo de parcelas, entregas, cláusulas LGPD e gere contratos formatados em alta
@@ -88,9 +88,9 @@ export default function Contracts() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-serif font-bold text-heading">
+              <h1 className="text-2xl font-serif font-bold text-heading">
                 Visualização do Contrato
-              </h2>
+              </h1>
               <p className="text-sm text-muted-foreground">
                 Documento jurídico pronto para conferência e assinatura.
               </p>
@@ -107,6 +107,7 @@ export default function Contracts() {
       {/* Formulário Interativo Completo */}
       {activeTab === 'create' && (
         <div className="space-y-6">
+          <h1 className="sr-only">Gerador Interativo de Contrato</h1>
           <InteractiveContractEditor
             initialContract={selectedContract}
             onGenerateSuccess={(contract) => {
@@ -124,9 +125,9 @@ export default function Contracts() {
           <div className="flex flex-col sm:flex-row gap-4 justify-between sm:items-end">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <h2 className="text-3xl text-heading font-semibold">
+                <h1 className="text-3xl font-serif text-heading font-semibold">
                   Contratos de Prestação de Serviços
-                </h2>
+                </h1>
                 <Badge
                   variant="secondary"
                   className="text-xs bg-accent/15 text-accent-foreground font-sans border-accent/30"
@@ -234,12 +235,24 @@ export default function Contracts() {
                   <tbody className="[&_tr:last-child]:border-0">
                     {contracts.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-8 text-center text-muted-foreground h-32">
-                          <div className="flex flex-col items-center justify-center gap-2">
-                            <FileSignature className="w-8 h-8 opacity-40" />
-                            <p className="font-medium">Nenhum contrato gerado ainda.</p>
-                            <Button size="sm" variant="outline" onClick={handleCreateNew}>
-                              Preencher Primeiro Contrato
+                        <td colSpan={7} className="text-center py-16 px-4">
+                          <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
+                            <div className="w-12 h-12 rounded-full bg-muted/60 flex items-center justify-center text-muted-foreground">
+                              <FileSignature className="w-6 h-6 text-primary" />
+                            </div>
+                            <h3 className="font-serif font-semibold text-base text-foreground">
+                              Nenhum contrato gerado ainda
+                            </h3>
+                            <p className="text-xs text-muted-foreground text-center">
+                              Crie contratos profissionais de prestação de serviços com cláusulas
+                              jurídicas completas, proteção LGPD e exportação para PDF.
+                            </p>
+                            <Button
+                              size="sm"
+                              onClick={handleCreateNew}
+                              className="gap-2 shadow-sm font-medium mt-1"
+                            >
+                              <Plus className="w-4 h-4" /> Criar Primeiro Contrato
                             </Button>
                           </div>
                         </td>

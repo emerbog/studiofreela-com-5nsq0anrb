@@ -119,7 +119,9 @@ export default function Login() {
 
         <Card className="border-border/70 shadow-lg bg-card">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl font-serif">Entrar na sua conta</CardTitle>
+            <h1 className="text-xl font-serif font-semibold text-foreground">
+              Entrar na sua conta
+            </h1>
             <CardDescription className="text-xs">Insira seus dados para autenticar</CardDescription>
           </CardHeader>
 

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { User, Mail, Lock, Loader2 } from 'lucide-react'
+import { User, Mail, Lock, Loader2, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { isValidEmail } from '@/lib/validators'
@@ -150,7 +150,7 @@ export default function Signup() {
 
         <Card className="border-border/70 shadow-lg bg-card">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl font-serif">Criar nova conta</CardTitle>
+            <h1 className="text-xl font-serif font-semibold text-foreground">Criar nova conta</h1>
             <CardDescription className="text-xs">
               Comece no plano gratuito, sem necessidade de cartão de crédito
             </CardDescription>
