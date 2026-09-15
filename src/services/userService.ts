@@ -6,7 +6,7 @@ export const getAvatarUrl = (user: UserProfile | null): string => {
   if (user.avatar && !user.avatar.startsWith('http')) {
     return pb.files.getURL(user as any, user.avatar)
   }
-  return user.avatar || 'https://img.usecurling.com/ppl/thumbnail?gender=male&seed=1'
+  return user.avatar || ''
 }
 
 export const userService = {

@@ -20,13 +20,12 @@ import {
   ArrowRight,
   ShieldCheck,
   Sparkles,
-  Zap,
   TrendingUp,
   Clock,
   Layers,
-  ChevronRight,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
+import { StudioFreelaLogo } from '@/components/StudioFreelaLogo'
 
 export default function LandingPage() {
   const { isAuthenticated } = useAuth()
@@ -38,17 +37,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/90 backdrop-blur-md transition-all">
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-serif text-xl font-bold shadow-sm transition-transform group-hover:scale-105">
-              G
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xl font-serif font-bold tracking-tight text-foreground">
-                Gestão Freelance
-              </span>
-              <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">
-                Edição Elegante
-              </span>
-            </div>
+            <StudioFreelaLogo size={38} />
           </Link>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
@@ -94,7 +83,7 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif font-bold tracking-tight text-foreground leading-[1.12] max-w-4xl mx-auto mb-6">
-            Gestão Freelance com a sobriedade que seu trabalho merece.
+            Studio Freela: gestão com a sobriedade que seu trabalho merece.
           </h1>
 
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed font-light">
@@ -144,7 +133,7 @@ export default function LandingPage() {
                 <div className="w-3 h-3 rounded-full bg-amber-400/80" />
                 <div className="w-3 h-3 rounded-full bg-emerald-400/80" />
                 <div className="mx-auto text-xs font-mono text-muted-foreground/80 bg-background/60 px-4 py-0.5 rounded-md border border-border/40">
-                  gestaofreelance.app/dashboard
+                  studiofreela.com/dashboard
                 </div>
               </div>
               <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
@@ -154,16 +143,18 @@ export default function LandingPage() {
                   </span>
                   <div className="text-2xl font-bold text-foreground mt-1">R$ 14.850,00</div>
                   <span className="text-xs text-emerald-600 flex items-center gap-1 mt-2">
-                    <TrendingUp className="w-3 h-3" /> +18% em relação ao mês anterior
+                    <TrendingUp className="w-3 h-3" /> Fluxo sob controle e atualizado
                   </span>
                 </div>
                 <div className="p-4 rounded-xl bg-background border border-border/60 shadow-xs">
                   <span className="text-xs font-medium uppercase text-muted-foreground">
                     Próximo Evento
                   </span>
-                  <div className="text-xl font-bold text-foreground mt-1">Cobertura Lançamento</div>
+                  <div className="text-xl font-bold text-foreground mt-1">
+                    Cobertura Fotográfica
+                  </div>
                   <span className="text-xs text-muted-foreground mt-2 block">
-                    Empresa Alpha • 19:00
+                    Studio Alpha • 19:00
                   </span>
                 </div>
                 <div className="p-4 rounded-xl bg-background border border-border/60 shadow-xs">
@@ -172,7 +163,7 @@ export default function LandingPage() {
                   </span>
                   <div className="text-2xl font-bold text-foreground mt-1">12 Contratos</div>
                   <span className="text-xs text-primary font-medium mt-2 block">
-                    100% em conformidade LGPD
+                    Alinhados às diretrizes da LGPD
                   </span>
                 </div>
               </div>
@@ -527,8 +518,8 @@ export default function LandingPage() {
               </div>
               <h3 className="font-serif text-lg font-bold mb-1">Segurança e Privacidade</h3>
               <p className="text-xs text-muted-foreground max-w-xs">
-                Seus dados comerciais e de clientes protegidos com isolamento e criptografia de
-                ponta a ponta.
+                Seus dados comerciais e de clientes com isolamento rigoroso por conta, autenticação
+                moderna e comunicação segura via HTTPS.
               </p>
             </div>
 
@@ -580,16 +571,11 @@ export default function LandingPage() {
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-serif text-base font-bold">
-                  G
-                </div>
-                <span className="font-serif font-bold text-foreground text-lg">
-                  Gestão Freelance
-                </span>
-              </div>
+              <Link to="/" className="inline-block">
+                <StudioFreelaLogo size={34} showTagline={false} />
+              </Link>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                A ferramenta completa e elegante para a gestão do profissional autônomo moderno.
+                Studio Freela — a plataforma com a sobriedade que seu trabalho autônomo merece.
               </p>
             </div>
 
@@ -631,20 +617,40 @@ export default function LandingPage() {
                 Legal & Suporte
               </h4>
               <ul className="space-y-2 text-xs">
-                <li>Termos de Uso</li>
-                <li>Política de Privacidade</li>
-                <li>Conformidade com a LGPD</li>
-                <li>suporte@gestaofreelance.app</li>
+                <li>
+                  <Link to="/termos" className="hover:text-foreground transition-colors">
+                    Termos de Uso
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/privacidade" className="hover:text-foreground transition-colors">
+                    Política de Privacidade & Cookies
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/privacidade#lgpd" className="hover:text-foreground transition-colors">
+                    Direitos do Titular (LGPD)
+                  </Link>
+                </li>
+                <li>
+                  <a
+                    href="mailto:suporte@studiofreela.com"
+                    className="hover:text-foreground transition-colors"
+                  >
+                    suporte@studiofreela.com
+                  </a>
+                </li>
               </ul>
             </div>
           </div>
 
           <div className="border-t border-border/40 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
             <p>
-              © {new Date().getFullYear()} Gestão Freelance Elegante. Todos os direitos reservados.
+              © {new Date().getFullYear()} Studio Freela (studiofreela.com). Todos os direitos
+              reservados.
             </p>
             <div className="flex items-center gap-6">
-              <span>Feito para freelancers de alta performance</span>
+              <span>Gestão freelance com a sobriedade que seu trabalho merece.</span>
             </div>
           </div>
         </div>

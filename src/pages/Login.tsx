@@ -68,15 +68,52 @@ export default function Login() {
         {/* Branding header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-serif text-xl font-bold shadow-xs">
-              G
-            </div>
+            <svg
+              width="44"
+              height="44"
+              viewBox="0 0 100 100"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <rect
+                x="4"
+                y="4"
+                width="92"
+                height="92"
+                rx="22"
+                stroke="#2b2b2b"
+                strokeWidth="6"
+                fill="none"
+              />
+              <rect
+                x="14"
+                y="14"
+                width="72"
+                height="72"
+                rx="14"
+                stroke="#b07d4f"
+                strokeWidth="2"
+                fill="none"
+              />
+              <text
+                x="50"
+                y="62"
+                textAnchor="middle"
+                fill="#2b2b2b"
+                fontFamily="Cinzel, 'Playfair Display', serif"
+                fontSize="40"
+                fontWeight="700"
+              >
+                SF
+              </text>
+            </svg>
             <span className="text-2xl font-serif font-bold tracking-tight text-foreground">
-              Gestão Freelance
+              Studio Freela
             </span>
           </Link>
           <p className="text-sm text-muted-foreground">
-            Acesse seu painel e gerencie seus trabalhos com elegância
+            Acesse seu painel e gerencie seus trabalhos com sobriedade
           </p>
         </div>
 

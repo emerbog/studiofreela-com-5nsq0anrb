@@ -1,278 +1,360 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useCallback,
+} from 'react'
 import { Client, AppEvent, Finance, PlanTier, Quote, Contract } from '@/types'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { appDataService } from '@/services/appDataService'
+import pb from '@/lib/pocketbase/client'
 
 type AppDataContextType = {
   currentTier: PlanTier
-  setCurrentTier: (tier: PlanTier) => void
+  setCurrentTier: (tier: PlanTier) => Promise<void>
   clients: Client[]
   events: AppEvent[]
   finances: Finance[]
   quotes: Quote[]
   contracts: Contract[]
-  addClient: (client: Omit<Client, 'id' | 'createdAt'>) => void
-  addEvent: (event: Omit<AppEvent, 'id'>) => void
-  markFinanceAsPaid: (id: string) => void
-  addQuote: (quote: Omit<Quote, 'id' | 'number'>) => void
-  addContract: (contract: Omit<Contract, 'id' | 'number'>) => void
+  isLoadingData: boolean
+  refreshData: () => Promise<void>
+  addClient: (client: Omit<Client, 'id' | 'createdAt'>) => Promise<Client | null>
+  updateClient: (id: string, client: Partial<Omit<Client, 'id' | 'createdAt'>>) => Promise<boolean>
+  deleteClient: (id: string) => Promise<boolean>
+  addEvent: (event: Omit<AppEvent, 'id'>) => Promise<AppEvent | null>
+  updateEvent: (id: string, event: Partial<Omit<AppEvent, 'id'>>) => Promise<boolean>
+  deleteEvent: (id: string) => Promise<boolean>
+  markFinanceAsPaid: (id: string) => Promise<boolean>
+  addFinance: (finance: Omit<Finance, 'id'>) => Promise<Finance | null>
+  deleteFinance: (id: string) => Promise<boolean>
+  addQuote: (quote: Omit<Quote, 'id' | 'number'> & { number?: string }) => Promise<Quote | null>
+  updateQuote: (id: string, quote: Partial<Omit<Quote, 'id'>>) => Promise<boolean>
+  deleteQuote: (id: string) => Promise<boolean>
+  addContract: (
+    contract: Omit<Contract, 'id' | 'number'> & { number?: string },
+  ) => Promise<Contract | null>
+  updateContract: (id: string, contract: Partial<Omit<Contract, 'id'>>) => Promise<boolean>
+  deleteContract: (id: string) => Promise<boolean>
 }
-
-const generateId = () => Math.random().toString(36).substring(2, 9)
-
-const initialClients: Client[] = [
-  {
-    id: 'c1',
-    name: 'Empresa Alpha',
-    email: 'contato@alpha.com',
-    phone: '(11) 99999-1111',
-    document: '12.345.678/0001-90',
-    notes: 'Cliente VIP',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'c2',
-    name: 'Studio Beta',
-    email: 'ola@studiobeta.com',
-    phone: '(21) 98888-2222',
-    document: '98.765.432/0001-10',
-    notes: 'Agência parceira',
-    createdAt: new Date().toISOString(),
-  },
-]
-
-const initialEvents: AppEvent[] = [
-  {
-    id: 'e1',
-    title: 'Cobertura Lançamento',
-    clientId: 'c1',
-    date: new Date(Date.now() + 86400000 * 2).toISOString(),
-    time: '19:00',
-    location: 'Hotel Fasano, SP',
-    value: 4500,
-    status: 'Confirmado',
-  },
-  {
-    id: 'e2',
-    title: 'Ensaio Corporativo',
-    clientId: 'c2',
-    date: new Date(Date.now() + 86400000 * 5).toISOString(),
-    time: '14:00',
-    location: 'Studio Beta',
-    value: 2800,
-    status: 'Pendente',
-  },
-]
-
-const initialFinances: Finance[] = [
-  {
-    id: 'f1',
-    eventId: 'e1',
-    clientId: 'c1',
-    title: 'Adiantamento Lançamento',
-    value: 2250,
-    dueDate: new Date(Date.now() - 86400000).toISOString(),
-    status: 'Pago',
-  },
-  {
-    id: 'f2',
-    eventId: 'e1',
-    clientId: 'c1',
-    title: 'Restante Lançamento',
-    value: 2250,
-    dueDate: new Date(Date.now() + 86400000 * 3).toISOString(),
-    status: 'Pendente',
-  },
-  {
-    id: 'f3',
-    eventId: 'e2',
-    clientId: 'c2',
-    title: 'Sinal Ensaio',
-    value: 1400,
-    dueDate: new Date(Date.now() - 86400000 * 5).toISOString(),
-    status: 'Atrasado',
-  },
-]
-
-const initialQuotes: Quote[] = [
-  {
-    id: 'q1',
-    clientId: 'c1',
-    number: 'ORC-001',
-    date: new Date().toISOString(),
-    items: [
-      { id: 'i1', description: 'Cobertura Fotográfica (4h)', quantity: 1, unitPrice: 2000 },
-      { id: 'i2', description: 'Edição de Imagens (50 fotos)', quantity: 1, unitPrice: 500 },
-    ],
-    total: 2500,
-    status: 'Aprovado',
-  },
-]
-
-const initialContracts: Contract[] = [
-  {
-    id: 'ct1',
-    clientId: 'c1',
-    quoteId: 'q1',
-    number: 'CTR-001',
-    date: new Date().toISOString(),
-    content:
-      'Pelo presente instrumento particular, as partes firmam o presente contrato de prestação de serviços fotográficos.\n\nFica acordado o valor de R$2.500,00 referente à cobertura de evento...',
-    formData: {
-      clientName: 'Empresa Alpha Ltda',
-      clientDoc: '12.345.678/0001-90',
-      clientAddress: 'Av. Paulista, 1000 - São Paulo/SP',
-      clientLegalRep: 'Carlos Mendes',
-      clientEmail: 'contato@alpha.com',
-      clientPhone: '(11) 99999-1111',
-      contractorName: 'Felipe Freelancer',
-      contractorCpf: '123.456.789-00',
-      contractorRg: '12.345.678-9 SSP/SP',
-      contractorAddress: 'Rua Augusta, 500, Apto 42 - São Paulo/SP',
-      contractorProfession: 'Desenvolvedor / Especialista Digital',
-      contractorEmail: 'felipe@freelance.com',
-      contractorPhone: '(11) 98765-4321',
-      serviceScope:
-        'Desenvolvimento e integração de plataforma web responsiva, incluindo módulos de gestão, agendamento e emissão de propostas.',
-      startDate: new Date().toISOString().slice(0, 10),
-      endDate: new Date(Date.now() + 86400000 * 30).toISOString().slice(0, 10),
-      deliverables: [
-        {
-          description: 'Arquitetura do sistema e layout aprovado',
-          date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
-        },
-        {
-          description: 'Módulo de clientes e agenda funcional',
-          date: new Date(Date.now() + 86400000 * 15).toISOString().slice(0, 10),
-        },
-        {
-          description: 'Módulo financeiro e gerador de contratos',
-          date: new Date(Date.now() + 86400000 * 22).toISOString().slice(0, 10),
-        },
-        {
-          description: 'Testes de homologação, ajustes finais e deploy',
-          date: new Date(Date.now() + 86400000 * 30).toISOString().slice(0, 10),
-        },
-      ],
-      acceptanceDays: 5,
-      totalValue: 2500,
-      billingType: 'fixed',
-      paymentMethod: 'pix',
-      pixKey: 'felipe@freelance.com (Chave E-mail)',
-      bankName: 'Nubank (260)',
-      bankAgency: '0001',
-      bankAccount: '1234567-8',
-      paymentSchedule: [
-        { installmentNumber: 1, amount: 1250, date: new Date().toISOString().slice(0, 10) },
-        {
-          installmentNumber: 2,
-          amount: 1250,
-          date: new Date(Date.now() + 86400000 * 30).toISOString().slice(0, 10),
-        },
-      ],
-      lateFinePercent: 2,
-      lateInterestMonthlyPercent: 1,
-      confidentialityPenaltyType: 'percent',
-      confidentialityPenaltyValue: 20,
-      dataController: 'Empresa Alpha Ltda',
-      dataOperator: 'Felipe Freelancer',
-      intellectualPropertyMaterials:
-        'Código-fonte customizado, documentação da API e assets visuais desenvolvidos especificamente para o projeto.',
-      portfolioPermission: 'allowed',
-      noticePeriodDays: 15,
-      generalPenaltyPercent: 10,
-      forumCity: 'São Paulo/SP',
-      signatureLocation: 'São Paulo/SP',
-      signatureDate: new Date().toISOString().slice(0, 10),
-      witness1Name: 'Mariana Souza',
-      witness1Cpf: '111.222.333-44',
-      witness2Name: 'Roberto Lima',
-      witness2Cpf: '555.666.777-88',
-    },
-    status: 'Assinado',
-  },
-]
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined)
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const { user, updateProfile } = useAuth()
+  const { user, isAuthenticated, updateProfile } = useAuth()
   const [currentTier, setCurrentTierState] = useState<PlanTier>(
     () => user?.plan_tier || 'intermediate',
   )
-  const [clients, setClients] = useState<Client[]>(initialClients)
+
+  const [clients, setClients] = useState<Client[]>([])
+  const [events, setEvents] = useState<AppEvent[]>([])
+  const [finances, setFinances] = useState<Finance[]>([])
+  const [quotes, setQuotes] = useState<Quote[]>([])
+  const [contracts, setContracts] = useState<Contract[]>([])
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(true)
 
   // Sync tier with user profile
-  React.useEffect(() => {
+  useEffect(() => {
     if (user?.plan_tier && user.plan_tier !== currentTier) {
       setCurrentTierState(user.plan_tier)
     }
   }, [user?.plan_tier])
 
-  const setCurrentTier = (tier: PlanTier) => {
+  const setCurrentTier = async (tier: PlanTier) => {
     setCurrentTierState(tier)
     if (user?.id) {
-      updateProfile({ plan_tier: tier })
+      await updateProfile({ plan_tier: tier })
     }
   }
-  const [events, setEvents] = useState<AppEvent[]>(initialEvents)
-  const [finances, setFinances] = useState<Finance[]>(initialFinances)
-  const [quotes, setQuotes] = useState<Quote[]>(initialQuotes)
-  const [contracts, setContracts] = useState<Contract[]>(initialContracts)
 
-  const addClient = (clientData: Omit<Client, 'id' | 'createdAt'>) => {
-    const newClient: Client = {
-      ...clientData,
-      id: generateId(),
-      createdAt: new Date().toISOString(),
+  // Load real data from backend when user is authenticated
+  const loadData = useCallback(async () => {
+    if (!isAuthenticated || !pb.authStore.isValid) {
+      setClients([])
+      setEvents([])
+      setFinances([])
+      setQuotes([])
+      setContracts([])
+      setIsLoadingData(false)
+      return
     }
-    setClients((prev) => [newClient, ...prev])
-    toast.success('Cliente adicionado com sucesso!')
+
+    setIsLoadingData(true)
+    try {
+      const [c, e, f, q, ct] = await Promise.all([
+        appDataService.getClients().catch((err) => {
+          console.warn('Erro ao carregar clientes:', err)
+          return []
+        }),
+        appDataService.getEvents().catch((err) => {
+          console.warn('Erro ao carregar eventos:', err)
+          return []
+        }),
+        appDataService.getFinances().catch((err) => {
+          console.warn('Erro ao carregar recebíveis:', err)
+          return []
+        }),
+        appDataService.getQuotes().catch((err) => {
+          console.warn('Erro ao carregar orçamentos:', err)
+          return []
+        }),
+        appDataService.getContracts().catch((err) => {
+          console.warn('Erro ao carregar contratos:', err)
+          return []
+        }),
+      ])
+
+      setClients(c)
+      setEvents(e)
+      setFinances(f)
+      setQuotes(q)
+      setContracts(ct)
+    } finally {
+      setIsLoadingData(false)
+    }
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // Clients CRUD
+  const addClient = async (
+    clientData: Omit<Client, 'id' | 'createdAt'>,
+  ): Promise<Client | null> => {
+    try {
+      const created = await appDataService.createClient(clientData)
+      setClients((prev) => [created, ...prev])
+      toast.success('Cliente cadastrado com sucesso!')
+      return created
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao cadastrar cliente.'
+      toast.error('Erro no cadastro', { description: msg })
+      return null
+    }
   }
 
-  const addEvent = (eventData: Omit<AppEvent, 'id'>) => {
-    const newEvent: AppEvent = { ...eventData, id: generateId() }
-    setEvents((prev) => [...prev, newEvent])
-
-    // Automatically generate a receivable for the new event
-    const newFinance: Finance = {
-      id: generateId(),
-      eventId: newEvent.id,
-      clientId: newEvent.clientId,
-      title: `Pagamento: ${newEvent.title}`,
-      value: newEvent.value,
-      dueDate: newEvent.date,
-      status: 'Pendente',
+  const updateClient = async (
+    id: string,
+    clientData: Partial<Omit<Client, 'id' | 'createdAt'>>,
+  ): Promise<boolean> => {
+    try {
+      const updated = await appDataService.updateClient(id, clientData)
+      setClients((prev) => prev.map((c) => (c.id === id ? updated : c)))
+      toast.success('Cliente atualizado com sucesso!')
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao atualizar cliente.'
+      toast.error('Erro ao atualizar', { description: msg })
+      return false
     }
-    setFinances((prev) => [...prev, newFinance])
-    toast.success('Evento agendado e título financeiro gerado!')
   }
 
-  const markFinanceAsPaid = (id: string) => {
-    setFinances((prev) => prev.map((f) => (f.id === id ? { ...f, status: 'Pago' } : f)))
-    toast.success('Pagamento confirmado com sucesso!', {
-      description: 'O saldo foi atualizado em suas contas.',
-    })
+  const deleteClient = async (id: string): Promise<boolean> => {
+    try {
+      await appDataService.deleteClient(id)
+      setClients((prev) => prev.filter((c) => c.id !== id))
+      toast.success('Cliente excluído com sucesso!')
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao excluir cliente.'
+      toast.error('Erro ao excluir', { description: msg })
+      return false
+    }
   }
 
-  const addQuote = (quoteData: Omit<Quote, 'id' | 'number'>) => {
-    const newQuote: Quote = {
-      ...quoteData,
-      id: generateId(),
-      number: `ORC-${(quotes.length + 1).toString().padStart(3, '0')}`,
+  // Events CRUD
+  const addEvent = async (eventData: Omit<AppEvent, 'id'>): Promise<AppEvent | null> => {
+    try {
+      const createdEvent = await appDataService.createEvent(eventData)
+      setEvents((prev) => [...prev, createdEvent])
+
+      // Auto-generate finance receivable on backend
+      try {
+        const createdFinance = await appDataService.createFinance({
+          clientId: createdEvent.clientId,
+          eventId: createdEvent.id,
+          title: `Pagamento: ${createdEvent.title}`,
+          value: createdEvent.value,
+          dueDate: createdEvent.date,
+          status: 'Pendente',
+        })
+        setFinances((prev) => [...prev, createdFinance])
+      } catch (fErr) {
+        console.warn('Erro ao auto-gerar título:', fErr)
+      }
+
+      toast.success('Evento agendado e título financeiro gerado!')
+      return createdEvent
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao agendar evento.'
+      toast.error('Erro no agendamento', { description: msg })
+      return null
     }
-    setQuotes((prev) => [newQuote, ...prev])
-    toast.success('Orçamento criado com sucesso!')
   }
 
-  const addContract = (contractData: Omit<Contract, 'id' | 'number'>) => {
-    const newContract: Contract = {
-      ...contractData,
-      id: generateId(),
-      number: `CTR-${(contracts.length + 1).toString().padStart(3, '0')}`,
+  const updateEvent = async (
+    id: string,
+    eventData: Partial<Omit<AppEvent, 'id'>>,
+  ): Promise<boolean> => {
+    try {
+      const updated = await appDataService.updateEvent(id, eventData)
+      setEvents((prev) => prev.map((e) => (e.id === id ? updated : e)))
+      toast.success('Evento atualizado com sucesso!')
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao atualizar evento.'
+      toast.error('Erro ao atualizar', { description: msg })
+      return false
     }
-    setContracts((prev) => [newContract, ...prev])
-    toast.success('Contrato gerado com sucesso!')
+  }
+
+  const deleteEvent = async (id: string): Promise<boolean> => {
+    try {
+      await appDataService.deleteEvent(id)
+      setEvents((prev) => prev.filter((e) => e.id !== id))
+      toast.success('Evento excluído com sucesso!')
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao excluir evento.'
+      toast.error('Erro ao excluir', { description: msg })
+      return false
+    }
+  }
+
+  // Finances CRUD
+  const markFinanceAsPaid = async (id: string): Promise<boolean> => {
+    try {
+      const updated = await appDataService.updateFinance(id, { status: 'Pago' })
+      setFinances((prev) => prev.map((f) => (f.id === id ? updated : f)))
+      toast.success('Pagamento confirmado com sucesso!', {
+        description: 'O saldo foi atualizado em suas contas.',
+      })
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao confirmar pagamento.'
+      toast.error('Erro ao atualizar', { description: msg })
+      return false
+    }
+  }
+
+  const addFinance = async (financeData: Omit<Finance, 'id'>): Promise<Finance | null> => {
+    try {
+      const created = await appDataService.createFinance(financeData)
+      setFinances((prev) => [...prev, created])
+      toast.success('Título financeiro adicionado!')
+      return created
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao adicionar título.'
+      toast.error('Erro financeiro', { description: msg })
+      return null
+    }
+  }
+
+  const deleteFinance = async (id: string): Promise<boolean> => {
+    try {
+      await appDataService.deleteFinance(id)
+      setFinances((prev) => prev.filter((f) => f.id !== id))
+      toast.success('Título excluído com sucesso!')
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao excluir título.'
+      toast.error('Erro ao excluir', { description: msg })
+      return false
+    }
+  }
+
+  // Quotes CRUD
+  const addQuote = async (
+    quoteData: Omit<Quote, 'id' | 'number'> & { number?: string },
+  ): Promise<Quote | null> => {
+    try {
+      const created = await appDataService.createQuote(quoteData)
+      setQuotes((prev) => [created, ...prev])
+      toast.success('Orçamento criado com sucesso!')
+      return created
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao criar orçamento.'
+      toast.error('Erro no orçamento', { description: msg })
+      return null
+    }
+  }
+
+  const updateQuote = async (
+    id: string,
+    quoteData: Partial<Omit<Quote, 'id'>>,
+  ): Promise<boolean> => {
+    try {
+      const updated = await appDataService.updateQuote(id, quoteData)
+      setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
+      toast.success('Orçamento atualizado com sucesso!')
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao atualizar orçamento.'
+      toast.error('Erro ao atualizar', { description: msg })
+      return false
+    }
+  }
+
+  const deleteQuote = async (id: string): Promise<boolean> => {
+    try {
+      await appDataService.deleteQuote(id)
+      setQuotes((prev) => prev.filter((q) => q.id !== id))
+      toast.success('Orçamento excluído com sucesso!')
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao excluir orçamento.'
+      toast.error('Erro ao excluir', { description: msg })
+      return false
+    }
+  }
+
+  // Contracts CRUD
+  const addContract = async (
+    contractData: Omit<Contract, 'id' | 'number'> & { number?: string },
+  ): Promise<Contract | null> => {
+    try {
+      const created = await appDataService.createContract(contractData)
+      setContracts((prev) => [created, ...prev])
+      toast.success('Contrato gerado com sucesso!')
+      return created
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao gerar contrato.'
+      toast.error('Erro no contrato', { description: msg })
+      return null
+    }
+  }
+
+  const updateContract = async (
+    id: string,
+    contractData: Partial<Omit<Contract, 'id'>>,
+  ): Promise<boolean> => {
+    try {
+      const updated = await appDataService.updateContract(id, contractData)
+      setContracts((prev) => prev.map((ct) => (ct.id === id ? updated : ct)))
+      toast.success('Contrato atualizado com sucesso!')
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao atualizar contrato.'
+      toast.error('Erro ao atualizar', { description: msg })
+      return false
+    }
+  }
+
+  const deleteContract = async (id: string): Promise<boolean> => {
+    try {
+      await appDataService.deleteContract(id)
+      setContracts((prev) => prev.filter((ct) => ct.id !== id))
+      toast.success('Contrato excluído com sucesso!')
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao excluir contrato.'
+      toast.error('Erro ao excluir', { description: msg })
+      return false
+    }
   }
 
   return (
@@ -285,11 +367,23 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         finances,
         quotes,
         contracts,
+        isLoadingData,
+        refreshData: loadData,
         addClient,
+        updateClient,
+        deleteClient,
         addEvent,
+        updateEvent,
+        deleteEvent,
         markFinanceAsPaid,
+        addFinance,
+        deleteFinance,
         addQuote,
+        updateQuote,
+        deleteQuote,
         addContract,
+        updateContract,
+        deleteContract,
       }}
     >
       {children}

@@ -8,18 +8,21 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+import { User, Mail, Lock, Loader2 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
-import { Loader2, ArrowLeft, User, Mail, Lock, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { isValidEmail } from '@/lib/validators'
 
 export default function Signup() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false)
   const { signup, loginWithGoogle } = useAuth()
@@ -36,12 +39,24 @@ export default function Signup() {
       toast.error('Informe seu e-mail.')
       return
     }
+    if (!name.trim()) {
+      toast.error('Informe seu nome completo.')
+      return
+    }
+    if (!isValidEmail(email)) {
+      toast.error('Informe um endereço de e-mail válido.')
+      return
+    }
     if (password.length < 8) {
       toast.error('A senha deve ter pelo menos 8 caracteres.')
       return
     }
     if (password !== passwordConfirm) {
       toast.error('As senhas não coincidem.')
+      return
+    }
+    if (!agreedToTerms) {
+      toast.error('É obrigatório concordar com os Termos de Uso e Política de Privacidade.')
       return
     }
 
@@ -84,15 +99,52 @@ export default function Signup() {
         {/* Branding header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-serif text-xl font-bold shadow-xs">
-              G
-            </div>
+            <svg
+              width="44"
+              height="44"
+              viewBox="0 0 100 100"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <rect
+                x="4"
+                y="4"
+                width="92"
+                height="92"
+                rx="22"
+                stroke="#2b2b2b"
+                strokeWidth="6"
+                fill="none"
+              />
+              <rect
+                x="14"
+                y="14"
+                width="72"
+                height="72"
+                rx="14"
+                stroke="#b07d4f"
+                strokeWidth="2"
+                fill="none"
+              />
+              <text
+                x="50"
+                y="62"
+                textAnchor="middle"
+                fill="#2b2b2b"
+                fontFamily="Cinzel, 'Playfair Display', serif"
+                fontSize="40"
+                fontWeight="700"
+              >
+                SF
+              </text>
+            </svg>
             <span className="text-2xl font-serif font-bold tracking-tight text-foreground">
-              Gestão Freelance
+              Studio Freela
             </span>
           </Link>
           <p className="text-sm text-muted-foreground">
-            Crie sua conta e profissionalize sua gestão hoje mesmo
+            Crie sua conta e profissionalize sua gestão autônoma hoje mesmo
           </p>
         </div>
 
@@ -223,6 +275,37 @@ export default function Signup() {
                     autoComplete="new-password"
                   />
                 </div>
+              </div>
+
+              {/* Termos e LGPD */}
+              <div className="flex items-start gap-2 pt-1">
+                <Checkbox
+                  id="terms"
+                  checked={agreedToTerms}
+                  onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+                />
+                <Label
+                  htmlFor="terms"
+                  className="text-xs text-muted-foreground leading-relaxed cursor-pointer font-normal"
+                >
+                  Declaro que li e concordo com os{' '}
+                  <Link
+                    to="/termos"
+                    target="_blank"
+                    className="text-primary hover:underline font-medium"
+                  >
+                    Termos de Uso
+                  </Link>{' '}
+                  e com a{' '}
+                  <Link
+                    to="/privacidade"
+                    target="_blank"
+                    className="text-primary hover:underline font-medium"
+                  >
+                    Política de Privacidade (LGPD)
+                  </Link>{' '}
+                  do Studio Freela.
+                </Label>
               </div>
 
               <Button

@@ -17,7 +17,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
           <span className="text-sm text-muted-foreground font-serif">
-            Carregando Gestão Freelance...
+            Carregando Studio Freela...
           </span>
         </div>
       </div>
@@ -40,7 +40,7 @@ export const PublicOnlyRoute: React.FC<ProtectedRouteProps> = ({ children }) => 
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
           <span className="text-sm text-muted-foreground font-serif">
-            Carregando Gestão Freelance...
+            Carregando Studio Freela...
           </span>
         </div>
       </div>

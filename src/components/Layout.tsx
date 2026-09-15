@@ -74,7 +74,7 @@ export function Layout() {
   const { user, logout } = useAuth()
 
   const currentTitle =
-    navItems.find((item) => item.url === location.pathname)?.title || 'Gestão Freelance'
+    navItems.find((item) => item.url === location.pathname)?.title || 'Studio Freela'
 
   const handleLogout = () => {
     logout()
@@ -82,23 +82,61 @@ export function Layout() {
   }
 
   const avatarUrl = getAvatarUrl(user)
-  const initials = user?.name ? user.name.substring(0, 2).toUpperCase() : 'GF'
+  const initials = user?.name ? user.name.substring(0, 2).toUpperCase() : 'SF'
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background font-sans">
         <Sidebar>
           <SidebarHeader className="p-4 border-b border-sidebar-border">
-            <Link to="/dashboard" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center font-serif text-base font-bold shadow-xs">
-                G
-              </div>
+            <Link to="/dashboard" className="flex items-center gap-2.5 group">
+              <svg
+                width="34"
+                height="34"
+                viewBox="0 0 100 100"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="shrink-0"
+                aria-hidden="true"
+              >
+                <rect
+                  x="4"
+                  y="4"
+                  width="92"
+                  height="92"
+                  rx="22"
+                  stroke="#2b2b2b"
+                  strokeWidth="6"
+                  fill="none"
+                />
+                <rect
+                  x="14"
+                  y="14"
+                  width="72"
+                  height="72"
+                  rx="14"
+                  stroke="#b07d4f"
+                  strokeWidth="2"
+                  fill="none"
+                />
+                <text
+                  x="50"
+                  y="62"
+                  textAnchor="middle"
+                  fill="#2b2b2b"
+                  fontFamily="Cinzel, 'Playfair Display', serif"
+                  fontSize="40"
+                  fontWeight="700"
+                >
+                  SF
+                </text>
+              </svg>
               <div className="flex flex-col">
-                <span className="text-base font-serif font-bold text-sidebar-foreground tracking-tight">
-                  Gestão Freelance
+                <span className="text-base font-serif font-bold text-sidebar-foreground tracking-tight leading-none">
+                  Studio Freela
                 </span>
-                <span className="text-[10px] text-sidebar-foreground/60 uppercase tracking-widest font-medium">
-                  Elegante
+                <span className="text-[9px] text-[#b07d4f] uppercase tracking-wider font-medium mt-1">
+                  Gestão Sob Medida
                 </span>
               </div>
             </Link>

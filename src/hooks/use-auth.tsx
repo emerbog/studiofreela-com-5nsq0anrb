@@ -124,7 +124,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setToken(authData.token)
 
       toast.success('Conta criada com sucesso!', {
-        description: 'Seja bem-vindo ao Gestão Freelance!',
+        description: 'Seja bem-vindo ao Studio Freela!',
       })
       return { success: true }
     } catch (err: any) {
@@ -144,8 +144,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       toast.success('Autenticação com Google concluída!')
       return { success: true }
     } catch (err: any) {
-      const message = err?.response?.message || err?.message || 'Falha ao autenticar com Google.'
-      toast.error('Erro Google OAuth', { description: message })
+      const isMissingConfig =
+        err?.status === 400 ||
+        err?.message?.includes('provider') ||
+        err?.message?.includes('OAuth') ||
+        err?.response?.message?.includes('provider')
+      const message = isMissingConfig
+        ? 'O login com Google está aguardando as credenciais de produção (Client ID e Secret). Por gentileza, acesse com seu e-mail e senha cadastrados.'
+        : err?.response?.message || err?.message || 'Falha ao autenticar com Google.'
+      toast.error('Login com Google', { description: message })
       return { success: false, error: message }
     }
   }

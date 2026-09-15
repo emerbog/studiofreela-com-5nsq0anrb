@@ -11,6 +11,8 @@ import LandingPage from '@/pages/LandingPage'
 import Login from '@/pages/Login'
 import Signup from '@/pages/Signup'
 import ForgotPassword from '@/pages/ForgotPassword'
+import Terms from '@/pages/Terms'
+import Privacy from '@/pages/Privacy'
 import Index from '@/pages/Index'
 import Agenda from '@/pages/Agenda'
 import Clients from '@/pages/Clients'
@@ -57,7 +59,11 @@ const App = () => (
               }
             />
 
-            {/* Protected App Routes */}
+            {/* Rotas legais públicas */}
+            <Route path="/termos" element={<Terms />} />
+            <Route path="/privacidade" element={<Privacy />} />
+
+            {/* Rotas protegidas (Requer login com PocketBase) */}
             <Route
               element={
                 <ProtectedRoute>

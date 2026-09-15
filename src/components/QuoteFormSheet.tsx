@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useForm, useFieldArray } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
 import { useAppData } from '@/hooks/use-app-data'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Sheet,
   SheetContent,
@@ -10,10 +10,9 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  SheetFooter,
+  SheetClose,
 } from '@/components/ui/sheet'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -21,217 +20,276 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Loader2, Sparkles } from 'lucide-react'
+import { QuoteItem } from '@/types'
+import { formatCurrency } from '@/lib/formatters'
+import { toast } from 'sonner'
 
-type QuoteFormValues = {
-  clientId: string
-  status: 'Rascunho' | 'Enviado' | 'Aprovado' | 'Rejeitado'
-  items: {
-    description: string
-    quantity: number
-    unitPrice: number
-  }[]
-}
+export function QuoteFormSheet({
+  triggerAsChild,
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
+}: {
+  triggerAsChild?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
+  const { clients, addQuote, currentTier } = useAppData()
+  const [internalOpen, setInternalOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : internalOpen
+  const setOpen = isControlled ? setControlledOpen! : setInternalOpen
 
-const quoteItemSchema = z.object({
-  description: z.string().min(1, 'Descrição é obrigatória'),
-  quantity: z.number().min(1, 'Quantidade mínima é 1'),
-  unitPrice: z.number().min(0, 'Preço deve ser maior ou igual a 0'),
-})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [clientId, setClientId] = useState('')
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [items, setItems] = useState<QuoteItem[]>([
+    { id: '1', description: '', quantity: 1, unitPrice: 0 },
+  ])
 
-const quoteSchema = z.object({
-  clientId: z.string().min(1, 'Selecione um cliente'),
-  status: z.enum(['Rascunho', 'Enviado', 'Aprovado', 'Rejeitado']),
-  items: z.array(quoteItemSchema).min(1, 'Adicione pelo menos um item'),
-})
+  // Checagem de plano
+  const isEconomy = currentTier === 'economy'
 
-export function QuoteFormSheet({ triggerAsChild }: { triggerAsChild: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  const { clients, addQuote } = useAppData()
+  const handleAddItem = () => {
+    setItems([
+      ...items,
+      {
+        id: Math.random().toString(),
+        description: '',
+        quantity: 1,
+        unitPrice: 0,
+      },
+    ])
+  }
 
-  const form = useForm<QuoteFormValues>({
-    resolver: zodResolver(quoteSchema) as any,
-    defaultValues: {
-      clientId: '',
-      status: 'Rascunho',
-      items: [{ description: '', quantity: 1, unitPrice: 0 }],
-    },
-  })
+  const handleRemoveItem = (id: string) => {
+    if (items.length > 1) {
+      setItems(items.filter((item) => item.id !== id))
+    }
+  }
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'items',
-  })
+  const handleItemChange = (id: string, field: keyof QuoteItem, value: string | number) => {
+    setItems(
+      items.map((item) => {
+        if (item.id === id) {
+          return { ...item, [field]: value }
+        }
+        return item
+      }),
+    )
+  }
 
-  const onSubmit = (data: QuoteFormValues) => {
-    const total = data.items.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0)
+  const total = items.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0)
 
-    addQuote({
-      clientId: data.clientId,
-      date: new Date().toISOString(),
-      items: data.items.map((item) => ({ ...item, id: Math.random().toString(36).substring(7) })),
-      total,
-      status: data.status,
-    })
-    setOpen(false)
-    form.reset()
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (isEconomy) {
+      toast.error('Recurso do Plano Intermediate', {
+        description:
+          'Seu plano atual é o Economy. Faça upgrade para emitir orçamentos formais em PDF.',
+      })
+      return
+    }
+
+    if (!clientId) {
+      toast.error('Selecione um cliente para o orçamento.')
+      return
+    }
+
+    const hasInvalidItems = items.some(
+      (item) => !item.description.trim() || item.quantity <= 0 || item.unitPrice < 0,
+    )
+    if (hasInvalidItems) {
+      toast.error('Preencha a descrição, quantidade e valor de todos os itens do orçamento.')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const created = await addQuote({
+        clientId,
+        date: new Date(`${date}T12:00:00`).toISOString(),
+        items,
+        total,
+        status: 'Rascunho',
+      })
+
+      if (created) {
+        setOpen(false)
+        setItems([{ id: '1', description: '', quantity: 1, unitPrice: 0 }])
+        setClientId('')
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>{triggerAsChild}</SheetTrigger>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto p-0 flex flex-col">
-        <div className="p-6 pb-0">
-          <SheetHeader>
-            <SheetTitle>Novo Orçamento</SheetTitle>
-            <SheetDescription>
-              Crie uma proposta de serviços para enviar ao seu cliente.
-            </SheetDescription>
-          </SheetHeader>
-        </div>
+      {triggerAsChild ? (
+        <SheetTrigger asChild>{triggerAsChild}</SheetTrigger>
+      ) : (
+        <SheetTrigger asChild>
+          <Button className="gap-2 shadow-sm">
+            <Plus className="w-4 h-4" /> Novo Orçamento
+          </Button>
+        </SheetTrigger>
+      )}
+      <SheetContent className="sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="text-heading font-serif text-xl">Novo Orçamento</SheetTitle>
+          <SheetDescription className="text-xs">
+            Crie uma proposta comercial detalhada para enviar ao seu cliente.
+          </SheetDescription>
+        </SheetHeader>
 
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="p-6 pt-6 flex-1 flex flex-col gap-6"
-          >
-            <FormField
-              control={form.control}
-              name="clientId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cliente</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um cliente" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {clients.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+        {isEconomy && (
+          <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-start gap-2">
+            <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-[#b07d4f]" />
+            <div>
+              <strong>Plano Economy:</strong> orçamentos formais estão disponíveis a partir do plano{' '}
+              <strong>Intermediate</strong>. Faça upgrade no seu perfil para emitir.
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+          <div className="space-y-1.5">
+            <Label htmlFor="quote-client" className="text-xs font-medium">
+              Cliente *
+            </Label>
+            <Select required value={clientId} onValueChange={setClientId}>
+              <SelectTrigger id="quote-client">
+                <SelectValue placeholder="Selecione um cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    Nenhum cliente cadastrado ainda
+                  </SelectItem>
+                ) : (
+                  clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="quote-date" className="text-xs font-medium">
+              Data de Emissão *
+            </Label>
+            <Input
+              id="quote-date"
+              type="date"
+              required
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="text-sm"
             />
+          </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Itens do Orçamento</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })}
-                >
-                  <Plus className="w-4 h-4 mr-2" /> Adicionar Item
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                {fields.map((field, index) => (
-                  <div
-                    key={field.id}
-                    className="flex gap-3 items-start bg-muted/30 p-4 rounded-lg border border-border/50"
-                  >
-                    <div className="grid grid-cols-12 gap-3 flex-1">
-                      <div className="col-span-12 md:col-span-6">
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.description`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs text-muted-foreground">
-                                Descrição
-                              </FormLabel>
-                              <FormControl>
-                                <Input {...field} placeholder="Ex: Fotografia" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      <div className="col-span-6 md:col-span-2">
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.quantity`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs text-muted-foreground">Qtd</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  {...field}
-                                  onChange={(e) => field.onChange(Number(e.target.value))}
-                                />
-                              </FormControl>{' '}
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      <div className="col-span-6 md:col-span-4">
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.unitPrice`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs text-muted-foreground">
-                                Valor Unit. (R$)
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  {...field}
-                                  onChange={(e) => field.onChange(Number(e.target.value))}
-                                />
-                              </FormControl>{' '}
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
-                    {fields.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="mt-6 text-destructive hover:bg-destructive/10"
-                        onClick={() => remove(index)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-medium">Itens e Serviços *</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleAddItem}
+                className="text-xs h-7 gap-1 text-primary"
+              >
+                <Plus className="w-3.5 h-3.5" /> Adicionar Linha
+              </Button>
             </div>
 
-            <div className="mt-auto pt-6 border-t flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <div className="space-y-2">
+              {items.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="flex gap-2 items-center bg-muted/30 p-2.5 rounded-lg border border-border/40"
+                >
+                  <div className="flex-1">
+                    <Input
+                      placeholder={`Descrição do serviço ${index + 1}`}
+                      value={item.description}
+                      onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
+                      className="text-xs h-8 bg-background"
+                      required
+                    />
+                  </div>
+                  <div className="w-16">
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Qtd"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 1)
+                      }
+                      className="text-xs h-8 bg-background"
+                      required
+                    />
+                  </div>
+                  <div className="w-24">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Valor un."
+                      value={item.unitPrice || ''}
+                      onChange={(e) =>
+                        handleItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)
+                      }
+                      className="text-xs h-8 bg-background"
+                      required
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveItem(item.id)}
+                    disabled={items.length === 1}
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-border/60 flex items-center justify-between">
+            <span className="text-sm font-medium">Valor Total Previsto</span>
+            <span className="text-xl font-serif font-bold text-foreground">
+              {formatCurrency(total)}
+            </span>
+          </div>
+
+          <SheetFooter className="pt-4 border-t border-border/40 gap-2 sm:gap-0">
+            <SheetClose asChild>
+              <Button variant="outline" type="button" disabled={isSubmitting}>
                 Cancelar
               </Button>
-              <Button type="submit">Salvar Orçamento</Button>
-            </div>
-          </form>
-        </Form>
+            </SheetClose>
+            <Button type="submit" disabled={isSubmitting || isEconomy}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Gerando...
+                </>
+              ) : (
+                'Salvar Orçamento'
+              )}
+            </Button>
+          </SheetFooter>
+        </form>
       </SheetContent>
     </Sheet>
   )
 }
+export default QuoteFormSheet

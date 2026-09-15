@@ -15,16 +15,28 @@ import {
   Edit3,
   ShieldCheck,
   CheckCircle2,
+  Trash2,
 } from 'lucide-react'
 import { Contract } from '@/types'
 import { InteractiveContractEditor } from '@/components/InteractiveContractEditor'
 import { ContractDocumentViewer } from '@/components/ContractDocumentViewer'
 import { ContractFormDialog } from '@/components/ContractFormDialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export default function Contracts() {
-  const { currentTier, setCurrentTier, contracts, clients, quotes } = useAppData()
+  const { currentTier, setCurrentTier, contracts, clients, quotes, deleteContract } = useAppData()
   const [activeTab, setActiveTab] = useState<'list' | 'create' | 'view'>('list')
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null)
+  const [contractToDelete, setContractToDelete] = useState<Contract | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
 
   const tierPriority = { economy: 1, intermediate: 2, advanced: 3, premium: 3 }
@@ -298,6 +310,15 @@ export default function Contracts() {
                                   <Eye className="w-3.5 h-3.5" />
                                   Visualizar
                                 </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setContractToDelete(contract)}
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  title="Excluir contrato"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
                               </div>
                             </td>
                           </tr>
@@ -311,6 +332,39 @@ export default function Contracts() {
           </Card>
         </>
       )}
+
+      {/* Confirmação de exclusão */}
+      <AlertDialog
+        open={!!contractToDelete}
+        onOpenChange={(open) => !open && setContractToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">
+              Confirmar exclusão de contrato
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o contrato{' '}
+              <strong className="text-foreground">{contractToDelete?.number}</strong>? Esta ação é
+              definitiva e removerá as cláusulas e assinaturas vinculadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (contractToDelete) {
+                  await deleteContract(contractToDelete.id)
+                  setContractToDelete(null)
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir Contrato
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog para acionamento direto via componentes externos se necessário */}
       <ContractFormDialog open={dialogOpen} onOpenChange={setDialogOpen} />

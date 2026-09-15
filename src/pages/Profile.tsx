@@ -21,15 +21,30 @@ import {
   Briefcase,
   MapPin,
   Camera,
+  Save,
   KeyRound,
   ShieldCheck,
-  Loader2,
-  Save,
-  LogOut,
   Sparkles,
+  LogOut,
+  Loader2,
+  Download,
+  Trash2,
+  AlertTriangle,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useNavigate } from 'react-router-dom'
+import { appDataService } from '@/services/appDataService'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Link, useNavigate } from 'react-router-dom'
 
 export default function Profile() {
   const { user, updateProfile, changePassword, logout } = useAuth()
@@ -51,6 +66,12 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [isChangingPassword, setIsChangingPassword] = useState(false)
+
+  // LGPD Privacy & Data Management state
+  const [isExporting, setIsExporting] = useState(false)
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [confirmDeleteText, setConfirmDeleteText] = useState('')
 
   useEffect(() => {
     if (user) {
@@ -149,6 +170,56 @@ export default function Profile() {
     intermediate: 'Plano Intermediate',
     advanced: 'Plano Advanced',
     premium: 'Plano Advanced',
+  }
+
+  const handleExportData = async () => {
+    if (!user?.id) return
+    setIsExporting(true)
+    try {
+      const data = await appDataService.exportUserData(user.id)
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `studiofreela-meus-dados-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      toast.success('Arquivo JSON de dados exportado com sucesso!', {
+        description: 'Seus dados foram reunidos de acordo com o Art. 18 da LGPD.',
+      })
+    } catch (err: any) {
+      toast.error('Erro ao exportar dados', {
+        description: err?.message || 'Falha na reunião de dados da conta.',
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!user?.id) return
+    if (confirmDeleteText.trim() !== 'EXCLUIR') {
+      toast.error('Digite exatamente a palavra EXCLUIR para confirmar.')
+      return
+    }
+
+    setIsDeletingAccount(true)
+    try {
+      await appDataService.deleteAccount(user.id)
+      toast.success('Sua conta e dados foram excluídos definitivamente.')
+      logout()
+      navigate('/')
+    } catch (err: any) {
+      toast.error('Erro ao excluir conta', {
+        description: err?.message || 'Não foi possível completar a exclusão.',
+      })
+    } finally {
+      setIsDeletingAccount(false)
+      setDeleteDialogOpen(false)
+    }
   }
 
   return (
@@ -431,13 +502,120 @@ export default function Profile() {
                 <ShieldCheck className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p className="font-medium text-foreground">Sessão Segura</p>
-                  <p>Sua sessão está ativa e sincronizada com os servidores do Gestão Freelance.</p>
+                  <p>Sua sessão está ativa e sincronizada com os servidores do Studio Freela.</p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Seção LGPD: Meus dados e Privacidade */}
+          <Card className="border-border/70 shadow-sm bg-card">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-[#b07d4f]" />
+                <CardTitle className="text-lg font-serif">Meus Dados (LGPD)</CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                Em conformidade com a Lei Geral de Proteção de Dados (Lei 13.709/2018).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Controlador: <strong>Studio Freela</strong> (contato:{' '}
+                <a href="mailto:suporte@studiofreela.com" className="underline">
+                  suporte@studiofreela.com
+                </a>
+                ). Você tem o direito de portabilidade e esquecimento a qualquer momento.
+              </p>
+
+              <div className="space-y-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportData}
+                  disabled={isExporting}
+                  className="w-full justify-start gap-2 text-xs h-9"
+                >
+                  {isExporting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5 text-primary" />
+                  )}
+                  Exportar Meus Dados (JSON)
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className="w-full justify-start gap-2 text-xs h-9 text-destructive hover:bg-destructive/10 border-destructive/30"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Solicitar Exclusão da Conta
+                </Button>
+              </div>
+
+              <div className="pt-2 border-t border-border/40 text-[11px] text-muted-foreground flex items-center justify-between">
+                <Link to="/privacidade" className="hover:underline text-primary">
+                  Política de Privacidade
+                </Link>
+                <Link to="/termos" className="hover:underline text-primary">
+                  Termos de Uso
+                </Link>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Dialog confirmação dupla exclusão de conta */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" /> Excluir Conta Definitivamente
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-xs leading-relaxed">
+              <p>
+                Esta ação é <strong className="text-destructive">permanente e irreversível</strong>.
+                Todos os seus dados pessoais, clientes cadastrados, contratos, orçamentos, títulos
+                financeiros e eventos da agenda serão eliminados imediatamente do banco de dados do
+                Studio Freela.
+              </p>
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-foreground">
+                <Label htmlFor="confirm-del-input" className="text-xs font-semibold block mb-1">
+                  Digite "EXCLUIR" em maiúsculas para confirmar:
+                </Label>
+                <Input
+                  id="confirm-del-input"
+                  placeholder="EXCLUIR"
+                  value={confirmDeleteText}
+                  onChange={(e) => setConfirmDeleteText(e.target.value)}
+                  className="bg-background text-sm"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmDeleteText('')}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={confirmDeleteText.trim() !== 'EXCLUIR' || isDeletingAccount}
+              onClick={handleDeleteAccount}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingAccount ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Excluindo...
+                </>
+              ) : (
+                'Excluir Minha Conta Agora'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
