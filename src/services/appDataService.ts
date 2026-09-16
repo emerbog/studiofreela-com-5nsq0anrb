@@ -898,12 +898,43 @@ export const appDataService = {
 
   // LGPD Export
   async exportUserData(userId: string) {
-    const [clients, events, finances, quotes, contracts] = await Promise.all([
+    const [
+      clients,
+      events,
+      finances,
+      quotes,
+      contracts,
+      profProfile,
+      profExperiences,
+      profEducation,
+      profServices,
+      profEquipment,
+    ] = await Promise.all([
       pb.collection('clients').getFullList({ filter: `user = "${userId}"` }),
       pb.collection('events').getFullList({ filter: `user = "${userId}"` }),
       pb.collection('finances').getFullList({ filter: `user = "${userId}"` }),
       pb.collection('quotes').getFullList({ filter: `user = "${userId}"` }),
       pb.collection('contracts').getFullList({ filter: `user = "${userId}"` }),
+      pb
+        .collection('professional_profiles')
+        .getFullList({ filter: `user = "${userId}"` })
+        .catch(() => []),
+      pb
+        .collection('professional_experiences')
+        .getFullList({ filter: `user = "${userId}"` })
+        .catch(() => []),
+      pb
+        .collection('professional_education')
+        .getFullList({ filter: `user = "${userId}"` })
+        .catch(() => []),
+      pb
+        .collection('professional_services')
+        .getFullList({ filter: `user = "${userId}"` })
+        .catch(() => []),
+      pb
+        .collection('professional_equipment')
+        .getFullList({ filter: `user = "${userId}"` })
+        .catch(() => []),
     ])
 
     return {
@@ -916,6 +947,11 @@ export const appDataService = {
       finances,
       quotes,
       contracts,
+      professionalProfile: profProfile,
+      professionalExperiences: profExperiences,
+      professionalEducation: profEducation,
+      professionalServices: profServices,
+      professionalEquipment: profEquipment,
     }
   },
 

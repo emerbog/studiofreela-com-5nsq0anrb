@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-16T20:22:35.983Z",
+  "generatedAt": "2026-09-16T21:15:47.690Z",
   "collections": [
     {
       "name": "users",
@@ -651,6 +651,658 @@
         }
       ],
       "indexes": ["CREATE INDEX idx_contracts_user ON contracts (user)"]
+    },
+    {
+      "name": "professional_profiles",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && user = @request.auth.id",
+        "view": "@request.auth.id != '' && user = @request.auth.id",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && user = @request.auth.id",
+        "delete": "@request.auth.id != '' && user = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "commercial_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "professional_phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "professional_email",
+          "type": "email",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hide_residential_address",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "social_links",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "professional_title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "headline",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "bio",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "years_experience",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "travel_availability",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "work_mode",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["presencial", "remoto", "hibrido"]
+        },
+        {
+          "name": "languages",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "served_regions",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resume_blocks_config",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "show_updated_at_in_cv",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_prof_profiles_user ON professional_profiles (user)"]
+    },
+    {
+      "name": "professional_experiences",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && user = @request.auth.id",
+        "view": "@request.auth.id != '' && user = @request.auth.id",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && user = @request.auth.id",
+        "delete": "@request.auth.id != '' && user = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "company_client",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "start_date",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_date",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "current",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "location_or_mode",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "results_projects",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "show_in_cv",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "show_in_public",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "order",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_prof_exp_user ON professional_experiences (user)"]
+    },
+    {
+      "name": "professional_education",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && user = @request.auth.id",
+        "view": "@request.auth.id != '' && user = @request.auth.id",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && user = @request.auth.id",
+        "delete": "@request.auth.id != '' && user = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "institution",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "course_name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "period_or_year",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "certificate_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["graduacao", "pos_graduacao", "curso_livre", "certificacao"]
+        },
+        {
+          "name": "show_in_cv",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "show_in_public",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "order",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_prof_edu_user ON professional_education (user)"]
+    },
+    {
+      "name": "professional_services",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && user = @request.auth.id",
+        "view": "@request.auth.id != '' && user = @request.auth.id",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && user = @request.auth.id",
+        "delete": "@request.auth.id != '' && user = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "short_description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "category",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "audiovisual",
+            "fotografia",
+            "video",
+            "design",
+            "producao",
+            "sonorizacao",
+            "iluminacao",
+            "cenografia",
+            "tecnologia",
+            "traducao",
+            "suporte_tecnico",
+            "outro"
+          ]
+        },
+        {
+          "name": "billing_unit",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["hora", "diaria", "servico", "projeto", "outro"]
+        },
+        {
+          "name": "starting_price",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "price_range",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_available",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "show_in_cv",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "show_in_public",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "order",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_prof_srv_user ON professional_services (user)"]
+    },
+    {
+      "name": "professional_equipment",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && user = @request.auth.id",
+        "view": "@request.auth.id != '' && user = @request.auth.id",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && user = @request.auth.id",
+        "delete": "@request.auth.id != '' && user = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "category",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "cameras",
+            "lentes",
+            "iluminacao",
+            "audio",
+            "sonorizacao",
+            "paineis_led",
+            "projetores",
+            "computadores",
+            "estruturas",
+            "cenografia",
+            "moveis_acessorios",
+            "cabos_perifericos",
+            "outros"
+          ]
+        },
+        {
+          "name": "brand",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "model",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "quantity",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "technical_description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "condition",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["novo", "excelente", "bom", "marcas_uso"]
+        },
+        {
+          "name": "hourly_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "daily_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "event_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "deposit_or_commercial_note",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approximate_location",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "needs_operator",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["disponivel", "reservado", "manutencao", "indisponivel"]
+        },
+        {
+          "name": "show_in_public",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "show_in_cv",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "offer_in_quotes",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "order",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_prof_eq_user ON professional_equipment (user)"]
+    },
+    {
+      "name": "professional_pages",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && user = @request.auth.id",
+        "view": "@request.auth.id != '' && user = @request.auth.id",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && user = @request.auth.id",
+        "delete": "@request.auth.id != '' && user = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "theme",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "custom_bio",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_published",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_prof_pages_user ON professional_pages (user)"]
     }
   ]
 }

@@ -23,6 +23,8 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ClientSelector } from '@/components/ClientSelector'
 import { ClientFormSheet } from '@/components/ClientFormSheet'
+import { professionalCenterService } from '@/services/professionalCenterService'
+import { ProfessionalEquipment, ProfessionalService } from '@/types'
 import { formatCurrency, formatShortDate } from '@/lib/formatters'
 import {
   Quote,
@@ -99,6 +101,23 @@ export function QuoteFormSheet({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [clientSheetOpen, setClientSheetOpen] = useState(false)
+
+  // Sugestões de serviços e equipamentos do perfil profissional
+  const [catalogServices, setCatalogServices] = useState<ProfessionalService[]>([])
+  const [catalogEquipment, setCatalogEquipment] = useState<ProfessionalEquipment[]>([])
+
+  useEffect(() => {
+    if (open) {
+      professionalCenterService
+        .getServices()
+        .then(setCatalogServices)
+        .catch(() => {})
+      professionalCenterService
+        .getEquipment()
+        .then(setCatalogEquipment)
+        .catch(() => {})
+    }
+  }, [open])
 
   // Step 1: Cliente
   const [clientId, setClientId] = useState('')
@@ -943,7 +962,58 @@ export function QuoteFormSheet({
                     </Button>
                   </div>
 
+                  {/* Sugestões do Catálogo Profissional */}
+                  {catalogServices.filter((s) => s.is_available !== false).length > 0 && (
+                    <div className="p-2.5 bg-primary/5 rounded-lg border border-primary/20 space-y-1.5">
+                      <span className="text-[11px] font-medium text-primary block">
+                        Sugestões do seu catálogo de serviços:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {catalogServices
+                          .filter((s) => s.is_available !== false)
+                          .map((s) => (
+                            <Button
+                              key={s.id}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const unitMap: Record<string, ServiceUnit> = {
+                                  diaria: 'diária',
+                                  hora: 'hora',
+                                  servico: 'serviço',
+                                }
+                                const mappedUnit: ServiceUnit =
+                                  s.billing_unit && unitMap[s.billing_unit]
+                                    ? unitMap[s.billing_unit]
+                                    : 'serviço'
+
+                                setItems((prev) => [
+                                  ...prev,
+                                  {
+                                    id: Math.random().toString(),
+                                    description:
+                                      s.name +
+                                      (s.short_description ? ` - ${s.short_description}` : ''),
+                                    quantity: 1,
+                                    unit: mappedUnit,
+                                    unitPrice: s.starting_price || 0,
+                                  },
+                                ])
+                                toast.success(`Serviço "${s.name}" adicionado à proposta!`)
+                              }}
+                              className="text-[11px] h-6 px-2 bg-background hover:bg-primary/10 border-primary/30"
+                            >
+                              + {s.name}{' '}
+                              {s.starting_price ? `(${formatCurrency(s.starting_price)})` : ''}
+                            </Button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
+                    {' '}
                     {items.map((item, index) => {
                       const lineTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
                       return (
@@ -1153,7 +1223,67 @@ export function QuoteFormSheet({
                     </Button>
                   </div>
 
+                  {/* Sugestões rápidas de equipamentos cadastrados para locação/orçamento */}
+                  {catalogEquipment.filter((eq) => eq.offer_in_quotes !== false).length > 0 && (
+                    <div className="p-2.5 bg-primary/5 rounded-lg border border-primary/20 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-primary block">
+                          Meus equipamentos disponíveis para orçamento:
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Clique para inserir na proposta
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {catalogEquipment
+                          .filter((eq) => eq.offer_in_quotes !== false)
+                          .map((eq) => {
+                            const price =
+                              eq.daily_rate && eq.daily_rate > 0
+                                ? eq.daily_rate
+                                : eq.event_rate && eq.event_rate > 0
+                                  ? eq.event_rate
+                                  : 0
+                            const isAvail = eq.status === 'disponivel'
+
+                            return (
+                              <Button
+                                key={eq.id}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setEquipments((prev) => [
+                                    ...prev,
+                                    {
+                                      id: Math.random().toString(),
+                                      description: [eq.name, eq.brand, eq.model]
+                                        .filter(Boolean)
+                                        .join(' '),
+                                      quantity: 1,
+                                      unitPrice: price,
+                                      includedInService: price === 0,
+                                    },
+                                  ])
+                                  toast.success(`Equipamento "${eq.name}" adicionado à proposta!`)
+                                }}
+                                className={`text-[11px] h-6 px-2 bg-background border-primary/30 hover:bg-primary/10 ${
+                                  !isAvail ? 'opacity-70 border-dashed' : ''
+                                }`}
+                                title={`Disponibilidade: ${eq.status} (${eq.quantity} un.)`}
+                              >
+                                + {eq.name}
+                                {price > 0 ? ` (${formatCurrency(price)})` : ''}
+                                {!isAvail ? ` [${eq.status}]` : ''}
+                              </Button>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
+                    {' '}
                     {equipments.map((eq, index) => (
                       <div
                         key={eq.id || index}

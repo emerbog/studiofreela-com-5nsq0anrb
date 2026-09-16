@@ -83,6 +83,178 @@ export type UserProfile = {
   updated?: string
 }
 
+// -------------------------------------------------------------
+// CENTRO PROFISSIONAL - FASES 1 & 2
+// -------------------------------------------------------------
+
+export type WorkMode = 'presencial' | 'remoto' | 'hibrido'
+
+export type SocialLinks = {
+  instagram?: string
+  linkedin?: string
+  youtube?: string
+  website?: string
+  other?: string
+}
+
+export type ResumeBlockConfig = {
+  id: string
+  key:
+    | 'summary'
+    | 'experiences'
+    | 'education'
+    | 'services'
+    | 'skills'
+    | 'clients_served'
+    | 'featured_projects'
+    | 'testimonials'
+    | 'languages'
+    | 'equipment'
+    | 'contacts'
+    | 'links'
+    | 'commercial_notes'
+  title: string
+  visibleInCv: boolean
+  visibleInPublic: boolean
+  order: number
+}
+
+export type ProfessionalProfileData = {
+  id?: string
+  user?: string
+  commercial_name?: string
+  city?: string
+  state?: string
+  professional_phone?: string
+  professional_email?: string
+  hide_residential_address?: boolean
+  social_links?: SocialLinks
+  professional_title?: string
+  headline?: string // ~120 chars
+  bio?: string // ~1000 chars
+  years_experience?: number
+  travel_availability?: boolean
+  work_mode?: WorkMode
+  languages?: string[]
+  served_regions?: string
+  resume_blocks_config?: ResumeBlockConfig[]
+  show_updated_at_in_cv?: boolean
+  created?: string
+  updated?: string
+}
+
+export type ProfessionalExperience = {
+  id?: string
+  user?: string
+  company_client: string
+  role: string
+  start_date?: string
+  end_date?: string
+  current?: boolean
+  location_or_mode?: string
+  description?: string
+  results_projects?: string
+  show_in_cv?: boolean
+  show_in_public?: boolean
+  order?: number
+  created?: string
+  updated?: string
+}
+
+export type EducationType = 'graduacao' | 'pos_graduacao' | 'curso_livre' | 'certificacao'
+
+export type ProfessionalEducation = {
+  id?: string
+  user?: string
+  institution: string
+  course_name: string
+  period_or_year?: string
+  certificate_url?: string
+  type?: EducationType
+  show_in_cv?: boolean
+  show_in_public?: boolean
+  order?: number
+  created?: string
+  updated?: string
+}
+
+export type ServiceCategory =
+  | 'audiovisual'
+  | 'fotografia'
+  | 'video'
+  | 'design'
+  | 'producao'
+  | 'sonorizacao'
+  | 'iluminacao'
+  | 'cenografia'
+  | 'tecnologia'
+  | 'traducao'
+  | 'suporte_tecnico'
+  | 'outro'
+
+export type ServiceBillingUnit = 'hora' | 'diaria' | 'servico' | 'projeto' | 'outro'
+
+export type ProfessionalService = {
+  id?: string
+  user?: string
+  name: string
+  short_description?: string
+  category?: ServiceCategory
+  billing_unit?: ServiceBillingUnit
+  starting_price?: number
+  price_range?: string
+  is_available?: boolean
+  show_in_cv?: boolean
+  show_in_public?: boolean
+  order?: number
+  created?: string
+  updated?: string
+}
+
+export type EquipmentCategory =
+  | 'cameras'
+  | 'lentes'
+  | 'iluminacao'
+  | 'audio'
+  | 'sonorizacao'
+  | 'paineis_led'
+  | 'projetores'
+  | 'computadores'
+  | 'estruturas'
+  | 'cenografia'
+  | 'moveis_acessorios'
+  | 'cabos_perifericos'
+  | 'outros'
+
+export type EquipmentCondition = 'novo' | 'excelente' | 'bom' | 'marcas_uso'
+
+export type EquipmentStatus = 'disponivel' | 'reservado' | 'manutencao' | 'indisponivel'
+
+export type ProfessionalEquipment = {
+  id?: string
+  user?: string
+  name: string
+  category?: EquipmentCategory
+  brand?: string
+  model?: string
+  quantity: number
+  technical_description?: string
+  condition?: EquipmentCondition
+  hourly_rate?: number
+  daily_rate?: number
+  event_rate?: number
+  deposit_or_commercial_note?: string
+  approximate_location?: string
+  needs_operator?: boolean
+  status: EquipmentStatus
+  show_in_public?: boolean
+  show_in_cv?: boolean
+  offer_in_quotes?: boolean
+  order?: number
+  created?: string
+  updated?: string
+}
+
 export type ServiceUnit = 'serviço' | 'diária' | 'hora' | 'profissional' | 'peça' | 'outro'
 
 export type QuoteItem = {
