@@ -77,6 +77,7 @@ export type UserProfile = {
   phone?: string
   profession?: string
   address?: string
+  cpfCnpj?: string
   plan_tier?: PlanTier
   created?: string
   updated?: string

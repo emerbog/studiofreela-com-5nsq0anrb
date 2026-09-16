@@ -36,7 +36,9 @@ export function buildQuoteBinaryPdfBlob(
   client?: Client,
   user?: UserProfile | null,
 ): Blob {
-  const emissionDate = quote.date ? formatShortDate(quote.date) : formatShortDate(new Date().toISOString())
+  const emissionDate = quote.date
+    ? formatShortDate(quote.date)
+    : formatShortDate(new Date().toISOString())
   const validDays = quote.validityDays || 15
   const validUntilDate = new Date(quote.date ? new Date(quote.date) : new Date())
   validUntilDate.setDate(validUntilDate.getDate() + validDays)
@@ -425,7 +427,7 @@ export function buildQuoteBinaryPdfBlob(
     '48 327 Td',
     `(${pdfEscapeText(`Nome/Razao social: ${user?.name || 'Studio Freela'}`)}) Tj`,
     '48 315 Td',
-    `(${pdfEscapeText(`CPF/CNPJ: ${user?.cpfCnpj || '_________________________'}`)}) Tj`,
+    `(${pdfEscapeText(`CPF/CNPJ: ${user?.cpfCnpj || user?.phone || '_________________________'}`)}) Tj`,
     '48 303 Td',
     '(Data: _____ / _____ / _________) Tj',
     'ET',
@@ -450,7 +452,7 @@ export function buildQuoteBinaryPdfBlob(
     `(${pdfEscapeText(`Studio Freela (studiofreela.com) • Proposta Comercial #${quote.number || 'ORC'} • Pagina 2 de 2 • Preparado para GOV.BR`)}) Tj`,
     'ET',
     'Q',
-  ]
+  )
 
   // Montagem do PDF em sintaxe canônica PDF-1.4
   const page1Content = streamPage1.join('\n')
@@ -558,20 +560,12 @@ export function openGovBrSigner() {
  * Compartilha o arquivo PDF binário real nativamente via navigator.share({ files })
  * ou faz download automático quando indisponível.
  */
-export async function shareQuotePdfFile(
-  quote: Quote,
-  client?: Client,
-  user?: UserProfile | null,
-) {
+export async function shareQuotePdfFile(quote: Quote, client?: Client, user?: UserProfile | null) {
   const filename = generateQuotePdfFilename(quote, client)
   const blob = buildQuoteBinaryPdfBlob(quote, client, user)
   const file = new File([blob], filename, { type: 'application/pdf' })
 
-  if (
-    navigator.canShare &&
-    navigator.canShare({ files: [file] }) &&
-    navigator.share
-  ) {
+  if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
     try {
       await navigator.share({
         files: [file],
@@ -588,7 +582,9 @@ export async function shareQuotePdfFile(
 
   // Fallback: download direto do arquivo
   downloadQuoteBinaryPdf(quote, client, user)
-  toast.info('Compartilhamento de arquivo indisponível neste navegador. O PDF foi baixado diretamente.')
+  toast.info(
+    'Compartilhamento de arquivo indisponível neste navegador. O PDF foi baixado diretamente.',
+  )
 }
 
 /**
