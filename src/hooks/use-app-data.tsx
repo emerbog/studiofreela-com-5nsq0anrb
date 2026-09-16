@@ -28,8 +28,9 @@ type AppDataContextType = {
   addEvent: (event: Omit<AppEvent, 'id'>) => Promise<AppEvent | null>
   updateEvent: (id: string, event: Partial<Omit<AppEvent, 'id'>>) => Promise<boolean>
   deleteEvent: (id: string) => Promise<boolean>
-  markFinanceAsPaid: (id: string) => Promise<boolean>
+  markFinanceAsPaid: (id: string, paidDate?: string) => Promise<boolean>
   addFinance: (finance: Omit<Finance, 'id'>) => Promise<Finance | null>
+  updateFinance: (id: string, finance: Partial<Omit<Finance, 'id'>>) => Promise<boolean>
   deleteFinance: (id: string) => Promise<boolean>
   addQuote: (quote: Omit<Quote, 'id' | 'number'> & { number?: string }) => Promise<Quote | null>
   updateQuote: (id: string, quote: Partial<Omit<Quote, 'id'>>) => Promise<boolean>
@@ -226,9 +227,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }
 
   // Finances CRUD
-  const markFinanceAsPaid = async (id: string): Promise<boolean> => {
+  const markFinanceAsPaid = async (id: string, paidDate?: string): Promise<boolean> => {
     try {
-      const updated = await appDataService.updateFinance(id, { status: 'Pago' })
+      const updated = await appDataService.updateFinance(id, {
+        status: 'Pago',
+        paidAt: paidDate || new Date().toISOString(),
+      })
       setFinances((prev) => prev.map((f) => (f.id === id ? updated : f)))
       toast.success('Pagamento confirmado com sucesso!', {
         description: 'O saldo foi atualizado em suas contas.',
@@ -236,6 +240,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       return true
     } catch (err: any) {
       const msg = err?.response?.message || err?.message || 'Erro ao confirmar pagamento.'
+      toast.error('Erro ao atualizar', { description: msg })
+      return false
+    }
+  }
+
+  const updateFinance = async (
+    id: string,
+    financeData: Partial<Omit<Finance, 'id'>>,
+  ): Promise<boolean> => {
+    try {
+      const updated = await appDataService.updateFinance(id, financeData)
+      setFinances((prev) => prev.map((f) => (f.id === id ? updated : f)))
+      toast.success('Título financeiro atualizado!')
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Erro ao atualizar título.'
       toast.error('Erro ao atualizar', { description: msg })
       return false
     }
@@ -274,7 +294,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     try {
       const created = await appDataService.createQuote(quoteData)
       setQuotes((prev) => [created, ...prev])
-      toast.success('Orçamento criado com sucesso!')
+      // Reload events and finances to capture the synced changes
+      loadData()
+      toast.success('Orçamento salvo com sucesso!')
       return created
     } catch (err: any) {
       const msg = err?.response?.message || err?.message || 'Erro ao criar orçamento.'
@@ -290,6 +312,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     try {
       const updated = await appDataService.updateQuote(id, quoteData)
       setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
+      // Reload events and finances to capture the synced changes
+      loadData()
       toast.success('Orçamento atualizado com sucesso!')
       return true
     } catch (err: any) {
@@ -377,6 +401,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         deleteEvent,
         markFinanceAsPaid,
         addFinance,
+        updateFinance,
         deleteFinance,
         addQuote,
         updateQuote,

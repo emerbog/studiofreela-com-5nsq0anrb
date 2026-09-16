@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T22:41:36.956Z",
+  "generatedAt": "2026-09-16T19:21:09.085Z",
   "collections": [
     {
       "name": "users",
@@ -130,6 +130,37 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "tradeName",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "clientType",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["PF", "PJ"]
+        },
+        {
+          "name": "addressData",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "additionalContacts",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "preferences",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": ["CREATE INDEX idx_clients_user ON clients (user)"]
@@ -190,13 +221,6 @@
           "system": false
         },
         {
-          "name": "status",
-          "type": "select",
-          "required": true,
-          "system": false,
-          "selectValues": ["Confirmado", "Pendente", "Concluído"]
-        },
-        {
           "name": "created",
           "type": "autodate",
           "required": false,
@@ -209,11 +233,51 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "quote",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "quotes"
+        },
+        {
+          "name": "endDate",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "endTime",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "eventType",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["event", "pre_reservation", "receivable"]
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["Pré-reserva", "Confirmado", "Pendente", "Concluído", "Cancelado"]
         }
       ],
       "indexes": [
         "CREATE INDEX idx_events_user ON events (user)",
-        "CREATE INDEX idx_events_client ON events (client)"
+        "CREATE INDEX idx_events_client ON events (client)",
+        "CREATE INDEX `idx_events_quote` ON `events` (quote)"
       ]
     },
     {
@@ -267,13 +331,6 @@
           "system": false
         },
         {
-          "name": "status",
-          "type": "select",
-          "required": true,
-          "system": false,
-          "selectValues": ["Pago", "Pendente", "Atrasado"]
-        },
-        {
           "name": "created",
           "type": "autodate",
           "required": false,
@@ -286,9 +343,44 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "quote",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "quotes"
+        },
+        {
+          "name": "paymentScheduleItemId",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "paymentMethod",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "paidAt",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["Previsto", "Pendente", "Pago", "Atrasado", "Cancelado"]
         }
       ],
-      "indexes": ["CREATE INDEX idx_finances_user ON finances (user)"]
+      "indexes": [
+        "CREATE INDEX idx_finances_user ON finances (user)",
+        "CREATE INDEX `idx_finances_quote` ON `finances` (quote)"
+      ]
     },
     {
       "name": "quotes",
@@ -340,13 +432,6 @@
           "system": false
         },
         {
-          "name": "status",
-          "type": "select",
-          "required": true,
-          "system": false,
-          "selectValues": ["Rascunho", "Enviado", "Aprovado", "Rejeitado"]
-        },
-        {
           "name": "created",
           "type": "autodate",
           "required": false,
@@ -359,6 +444,111 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "eventName",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "eventLocation",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "eventStartDate",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "eventStartTime",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "eventEndDate",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "eventEndTime",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "validityDays",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "overtimeRule",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipments",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "logistics",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "paymentSchedule",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "priceSummary",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pdfHistory",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "statusHistory",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "Rascunho",
+            "Enviado",
+            "Confirmado",
+            "Rejeitado",
+            "Cancelado",
+            "Expirado",
+            "Aprovado"
+          ]
         }
       ],
       "indexes": ["CREATE INDEX idx_quotes_user ON quotes (user)"]

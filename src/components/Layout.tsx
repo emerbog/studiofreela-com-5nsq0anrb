@@ -37,6 +37,7 @@ import {
 } from 'lucide-react'
 import { ClientFormSheet } from './ClientFormSheet'
 import { EventFormDialog } from './EventFormDialog'
+import { QuoteFormSheet } from './QuoteFormSheet'
 import { useAppData } from '@/hooks/use-app-data'
 import { useAuth } from '@/hooks/use-auth'
 import { getAvatarUrl } from '@/services/userService'
@@ -50,13 +51,15 @@ type NavItem = {
   minTier: PlanTier
 }
 
+// 1. Dashboard, 2. Orçamentos, 3. Agenda, 4. Clientes, 5. Financeiro, 6. Contratos, 7. Meu Perfil
+// Liberado para beta (minTier: economy)
 const navItems: NavItem[] = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, minTier: 'economy' },
+  { title: 'Orçamentos', url: '/orcamentos', icon: FileText, minTier: 'economy' },
   { title: 'Agenda', url: '/agenda', icon: CalendarDays, minTier: 'economy' },
   { title: 'Clientes', url: '/clientes', icon: Users, minTier: 'economy' },
   { title: 'Financeiro', url: '/financeiro', icon: DollarSign, minTier: 'economy' },
-  { title: 'Orçamentos', url: '/orcamentos', icon: FileText, minTier: 'intermediate' },
-  { title: 'Contratos', url: '/contratos', icon: FileSignature, minTier: 'advanced' },
+  { title: 'Contratos', url: '/contratos', icon: FileSignature, minTier: 'economy' },
   { title: 'Meu Perfil', url: '/profile', icon: UserIcon, minTier: 'economy' },
 ]
 
@@ -176,21 +179,14 @@ export function Layout() {
               <SidebarGroupContent>
                 <div className="p-3 bg-sidebar-accent/50 rounded-lg border border-sidebar-border/50 text-xs text-sidebar-foreground/80 space-y-2">
                   <div className="flex items-center justify-between font-medium">
-                    <span>Plano Ativo</span>
-                    <span className="capitalize text-sidebar-primary font-semibold text-[11px] bg-sidebar-primary/10 px-2 py-0.5 rounded">
-                      {currentTier}
+                    <span>Studio Freela</span>
+                    <span className="capitalize text-primary font-semibold text-[11px] bg-primary/10 px-2 py-0.5 rounded">
+                      Acesso Beta
                     </span>
                   </div>
                   <p className="text-[11px] text-sidebar-foreground/60 leading-relaxed">
-                    Alterne ou consulte planos na página pública ou no menu da sua conta.
+                    Fluxo completo de orçamentos, agenda e financeiro liberado no período beta.
                   </p>
-                  <Link
-                    to="/"
-                    target="_blank"
-                    className="inline-flex items-center gap-1 text-[11px] text-sidebar-primary hover:underline pt-1"
-                  >
-                    Ver landing page <ExternalLink className="w-3 h-3" />
-                  </Link>
                 </div>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -229,37 +225,7 @@ export function Layout() {
                   Meu Perfil & Senha
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1">
-                  Trocar Plano (Simulação)
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() => setCurrentTier('economy')}
-                  className="justify-between cursor-pointer text-xs"
-                >
-                  Plano Economy (Free){' '}
-                  {currentTier === 'economy' && (
-                    <span className="w-2 h-2 rounded-full bg-primary" />
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setCurrentTier('intermediate')}
-                  className="justify-between cursor-pointer text-xs"
-                >
-                  Plano Intermediate (R$ 29,90){' '}
-                  {currentTier === 'intermediate' && (
-                    <span className="w-2 h-2 rounded-full bg-primary" />
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setCurrentTier('advanced')}
-                  className="justify-between cursor-pointer text-xs"
-                >
-                  Plano Advanced (R$ 49,90){' '}
-                  {(currentTier === 'advanced' || currentTier === 'premium') && (
-                    <span className="w-2 h-2 rounded-full bg-primary" />
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
+
                 <DropdownMenuItem
                   onClick={handleLogout}
                   className="cursor-pointer text-destructive focus:text-destructive"
@@ -292,6 +258,17 @@ export function Layout() {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
+                  <QuoteFormSheet
+                    triggerAsChild={
+                      <DropdownMenuItem
+                        onSelect={(e) => e.preventDefault()}
+                        className="font-semibold text-primary"
+                      >
+                        <FileText className="w-4 h-4 mr-2 text-primary" />
+                        Novo Orçamento
+                      </DropdownMenuItem>
+                    }
+                  />
                   <EventFormDialog
                     triggerAsChild={
                       <DropdownMenuItem onSelect={(e) => e.preventDefault()}>

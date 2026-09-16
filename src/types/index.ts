@@ -1,35 +1,69 @@
+export type ClientType = 'PF' | 'PJ'
+
+export type ClientAddress = {
+  cep?: string
+  street?: string
+  number?: string
+  complement?: string
+  neighborhood?: string
+  city?: string
+  state?: string
+}
+
+export type ClientAdditionalContact = {
+  id: string
+  name: string
+  role?: string
+  phone?: string
+  email?: string
+}
+
 export type Client = {
   id: string
   name: string
+  tradeName?: string
+  clientType?: ClientType
   email: string
   phone: string
   document: string
   notes: string
+  addressData?: ClientAddress
+  additionalContacts?: ClientAdditionalContact[]
+  preferences?: string
   createdAt: string
 }
 
-export type EventStatus = 'Confirmado' | 'Pendente' | 'Concluído'
+export type EventStatus = 'Confirmado' | 'Pendente' | 'Concluído' | 'Pré-reserva' | 'Cancelado'
 
 export type AppEvent = {
   id: string
   title: string
   clientId: string
+  quoteId?: string
   date: string
+  endDate?: string
   time: string
+  endTime?: string
   location: string
   value: number
   status: EventStatus
+  eventType?: 'event' | 'pre_reservation' | 'receivable'
+  notes?: string
 }
 
-export type FinanceStatus = 'Pago' | 'Pendente' | 'Atrasado'
+export type FinanceStatus = 'Pago' | 'Pendente' | 'Atrasado' | 'Previsto' | 'Cancelado'
 
 export type Finance = {
   id: string
   eventId?: string
   clientId?: string
+  quoteId?: string
+  paymentScheduleItemId?: string
+  paymentMethod?: string
   title: string
-  value: number
+  value: number // in cents or standard decimal; formatted cleanly
   dueDate: string
+  paidAt?: string
   status: FinanceStatus
 }
 
@@ -48,11 +82,102 @@ export type UserProfile = {
   updated?: string
 }
 
+export type ServiceUnit = 'serviço' | 'diária' | 'hora' | 'profissional' | 'peça' | 'outro'
+
 export type QuoteItem = {
   id?: string
   description: string
   quantity: number
+  unit?: ServiceUnit | string
   unitPrice: number
+}
+
+export type QuoteEquipmentItem = {
+  id?: string
+  description: string
+  quantity: number
+  unitPrice: number
+  includedInService?: boolean
+}
+
+export type OvertimeRule = {
+  enabled: boolean
+  hourlyRate: number
+  graceMinutes?: number
+  notes?: string
+}
+
+export type ResponsibilityType =
+  | 'contractor' // Paga pelo contratante (responsabilidade direta)
+  | 'contracted' // Paga pelo profissional (cobrada no total se houver valor)
+  | 'not_applicable' // Não se aplica
+
+export type LogisticsConfig = {
+  meal: {
+    type: ResponsibilityType
+    notes?: string
+    chargedAmount?: number
+  }
+  transport: {
+    type: ResponsibilityType
+    originDestination?: string
+    notes?: string
+    chargedAmount?: number
+  }
+  lodging: {
+    type: ResponsibilityType
+    nightsCount?: number
+    notes?: string
+    chargedAmount?: number
+  }
+}
+
+export type PaymentInstallmentMethod =
+  | 'PIX'
+  | 'Transferência'
+  | 'Dinheiro'
+  | 'Cartão'
+  | 'Boleto'
+  | 'Outro'
+
+export type QuotePaymentInstallment = {
+  id: string
+  description: string
+  dueDate: string
+  value: number // in currency value
+  percentage?: number
+  method: PaymentInstallmentMethod
+  notes?: string
+}
+
+export type PriceSummary = {
+  servicesSubtotal: number
+  equipmentsSubtotal: number
+  expensesSubtotal: number
+  discounts: number
+  grandTotal: number
+  overtimeSeparated: boolean
+}
+
+export type QuoteStatus =
+  | 'Rascunho'
+  | 'Enviado' // Pré-reserva
+  | 'Confirmado'
+  | 'Rejeitado'
+  | 'Cancelado'
+  | 'Expirado'
+  | 'Aprovado' // legacy mapped to Confirmado
+
+export type StatusHistoryEntry = {
+  status: QuoteStatus
+  timestamp: string
+  note?: string
+}
+
+export type PdfHistoryEntry = {
+  version: number
+  generatedAt: string
+  url?: string
 }
 
 export type Quote = {
@@ -60,9 +185,31 @@ export type Quote = {
   clientId: string
   number: string
   date: string
+  validityDays?: number
+  status: QuoteStatus
+
+  // Event info
+  eventName?: string
+  eventLocation?: string
+  eventStartDate?: string
+  eventStartTime?: string
+  eventEndDate?: string
+  eventEndTime?: string
+  notes?: string
+
+  // Items and logistics
   items: QuoteItem[]
+  equipments?: QuoteEquipmentItem[]
+  overtimeRule?: OvertimeRule
+  logistics?: LogisticsConfig
+  paymentSchedule?: QuotePaymentInstallment[]
+  priceSummary?: PriceSummary
+
   total: number
-  status: 'Rascunho' | 'Enviado' | 'Aprovado' | 'Rejeitado'
+
+  // Audit
+  statusHistory?: StatusHistoryEntry[]
+  pdfHistory?: PdfHistoryEntry[]
 }
 
 export type ContractDeliverable = {

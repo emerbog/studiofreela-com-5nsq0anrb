@@ -278,11 +278,14 @@ export default function Profile() {
                 <h2 className="text-xl font-bold font-serif text-foreground">
                   {name || 'Usuário'}
                 </h2>
-                <Badge variant="secondary" className="w-fit mx-auto sm:mx-0 font-normal">
+                <Badge
+                  variant="secondary"
+                  className="w-fit mx-auto sm:mx-0 font-normal bg-primary/10 text-primary border-primary/20"
+                >
                   <Sparkles className="w-3 h-3 mr-1 text-primary" />
-                  {planLabels[user?.plan_tier || 'economy'] || 'Plano Economy'}
+                  Studio Freela Beta
                 </Badge>
-              </div>
+              </div>{' '}
               <p className="text-sm text-muted-foreground">
                 {profession || 'Profissional Autônomo'}
               </p>

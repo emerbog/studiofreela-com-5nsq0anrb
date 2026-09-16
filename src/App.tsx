@@ -76,6 +76,7 @@ const App = () => (
               <Route path="/clientes" element={<Clients />} />
               <Route path="/financeiro" element={<Financial />} />
               <Route path="/orcamentos" element={<Quotes />} />
+              <Route path="/quotes" element={<Navigate to="/orcamentos" replace />} />
               <Route path="/contratos" element={<Contracts />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/configuracoes" element={<Navigate to="/profile" replace />} />

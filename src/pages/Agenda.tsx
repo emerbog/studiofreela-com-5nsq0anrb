@@ -1,9 +1,8 @@
-import React, { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useAppData } from '@/hooks/use-app-data'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { Badge } from '@/components/ui/badge'
-import { Calendar } from '@/components/ui/calendar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,243 +10,455 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
-  MapPin,
+  CalendarIcon,
   Clock,
-  User,
+  MapPin,
+  MoreVertical,
   Plus,
-  CalendarDays,
-  MoreHorizontal,
-  Edit2,
   Trash2,
+  Edit,
+  DollarSign,
+  FileText,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react'
-import { formatDate, formatCurrency } from '@/lib/formatters'
+import { formatCurrency, formatDate, formatShortDate } from '@/lib/formatters'
+import { AppEvent, Finance, Quote } from '@/types'
 import { EventFormDialog } from '@/components/EventFormDialog'
-import { AppEvent } from '@/types'
+import { QuotePreviewDialog } from '@/components/QuotePreviewDialog'
+import { QuoteFormSheet } from '@/components/QuoteFormSheet'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
-export default function Agenda() {
-  const { events, clients, deleteEvent } = useAppData()
+export function Agenda() {
+  const navigate = useNavigate()
+  const { events, clients, finances, quotes, deleteEvent } = useAppData()
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
-  const [editingEvent, setEditingEvent] = useState<AppEvent | null>(null)
-  const [isEditOpen, setIsEditOpen] = useState(false)
-  const [eventToDelete, setEventToDelete] = useState<AppEvent | null>(null)
+  const [eventToEdit, setEventToEdit] = useState<AppEvent | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [quoteToPreview, setQuoteToPreview] = useState<Quote | null>(null)
+  const [quoteToEdit, setQuoteToEdit] = useState<Quote | null>(null)
+  const [isQuoteFormOpen, setIsQuoteFormOpen] = useState(false)
 
-  const selectedDateStr = selectedDate?.toISOString().split('T')[0]
+  // Filter events by selected date (match startDate or within start/end range)
+  const selectedDateStr = selectedDate ? selectedDate.toISOString().split('T')[0] : ''
 
-  const dayEvents = events.filter((e) => {
-    if (!selectedDateStr) return true
-    return e.date.startsWith(selectedDateStr)
-  })
+  const eventsForSelectedDate = useMemo(() => {
+    if (!selectedDateStr) return []
+    return events.filter((e) => {
+      const start = e.date ? e.date.split('T')[0] : ''
+      const end = e.endDate ? e.endDate.split('T')[0] : start
+      return selectedDateStr >= start && selectedDateStr <= end
+    })
+  }, [events, selectedDateStr])
 
-  // Dias com eventos para marcar no calendário
-  const eventDays = events.map((e) => new Date(e.date))
+  // Payment installments due on selected date
+  const financesForSelectedDate = useMemo(() => {
+    if (!selectedDateStr) return []
+    return finances.filter((f) => {
+      const due = f.dueDate ? f.dueDate.split('T')[0] : ''
+      return due === selectedDateStr
+    })
+  }, [finances, selectedDateStr])
 
-  const handleEdit = (event: AppEvent) => {
-    setEditingEvent(event)
-    setIsEditOpen(true)
-  }
+  // Calendar dates with dots
+  const datesWithActivity = useMemo(() => {
+    const set = new Set<string>()
+    events.forEach((e) => {
+      if (e.date) {
+        set.add(e.date.split('T')[0])
+      }
+      if (e.endDate) {
+        set.add(e.endDate.split('T')[0])
+      }
+    })
+    finances.forEach((f) => {
+      if (f.dueDate) {
+        set.add(f.dueDate.split('T')[0])
+      }
+    })
+    return set
+  }, [events, finances])
 
-  const handleDeleteConfirm = async () => {
-    if (eventToDelete) {
-      await deleteEvent(eventToDelete.id)
-      setEventToDelete(null)
+  const handleOpenEventFromQuote = (quoteId: string) => {
+    const q = quotes.find((item) => item.id === quoteId)
+    if (q) {
+      setQuoteToPreview(q)
+    } else {
+      navigate('/quotes')
     }
   }
 
+  const handleEditLinkedQuote = (quoteId: string) => {
+    const q = quotes.find((item) => item.id === quoteId)
+    if (q) {
+      setQuoteToEdit(q)
+      setIsQuoteFormOpen(true)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    await deleteEvent(id)
+  }
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Edit dialog */}
-      <EventFormDialog
-        open={isEditOpen}
-        onOpenChange={(open) => {
-          setIsEditOpen(open)
-          if (!open) setEditingEvent(null)
-        }}
-        eventToEdit={editingEvent}
-      />
-
-      {/* Delete confirmation dialog */}
-      <AlertDialog open={!!eventToDelete} onOpenChange={(open) => !open && setEventToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-serif">Confirmar exclusão de evento</AlertDialogTitle>
-            <AlertDialogDescription>
-              Deseja realmente remover o evento{' '}
-              <strong className="text-foreground">{eventToDelete?.title}</strong> da sua agenda?
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir Evento
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold tracking-tight text-heading">
-            Agenda & Compromissos
+          <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-tight text-heading">
+            Agenda
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Planejamento operacional com títulos automáticos vinculados a receber.
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Eventos confirmados (vermelho), pré-reservas (verde) e vencimentos de recebíveis
           </p>
         </div>
-        <EventFormDialog defaultDate={selectedDate} />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setQuoteToEdit(null)
+              setIsQuoteFormOpen(true)
+            }}
+            className="gap-2 text-xs h-9"
+          >
+            <Plus className="w-3.5 h-3.5" /> Novo Orçamento
+          </Button>
+          <Button
+            onClick={() => {
+              setEventToEdit(null)
+              setIsDialogOpen(true)
+            }}
+            className="gap-2 text-xs h-9 shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> Novo Evento Avulso
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <Card className="border border-border/60 shadow-xs lg:col-span-1">
-          <CardContent className="p-4 flex justify-center">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              className="rounded-md"
-              modifiers={{ hasEvent: eventDays }}
-              modifiersClassNames={{
-                hasEvent: 'font-bold underline decoration-primary decoration-2 underline-offset-4',
-              }}
-            />
-          </CardContent>
-        </Card>
+      {/* Legend Bar */}
+      <div className="flex flex-wrap items-center gap-3 p-3 bg-card rounded-xl border border-border/60 text-xs">
+        <span className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider font-mono">
+          Legenda:
+        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-emerald-500" />
+          <span className="text-foreground font-medium">
+            Verde: Pré-reserva (Orçamento enviado)
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-red-600" />
+          <span className="text-foreground font-medium">Vermelho: Evento Confirmado</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-blue-500" />
+          <span className="text-foreground font-medium">Azul: Recebível Previsto/Pendente</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-zinc-400" />
+          <span className="text-foreground font-medium">Cinza: Recebido / Concluído</span>
+        </div>
+      </div>
 
-        <div className="lg:col-span-2 space-y-4">
+      {/* Main Grid: Calendar & Day details */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+        {/* Calendar Picker */}
+        <div className="md:col-span-5 bg-card p-4 rounded-xl border border-border/70 shadow-xs">
+          <CalendarComponent
+            mode="single"
+            selected={selectedDate}
+            onSelect={setSelectedDate}
+            className="rounded-md mx-auto"
+            modifiers={{
+              hasActivity: (date) => {
+                const s = date.toISOString().split('T')[0]
+                return datesWithActivity.has(s)
+              },
+            }}
+            modifiersClassNames={{
+              hasActivity: 'font-bold underline decoration-primary decoration-2 underline-offset-4',
+            }}
+          />
+        </div>
+
+        {/* Selected Day Agenda Items */}
+        <div className="md:col-span-7 space-y-4">
           <div className="flex items-center justify-between pb-2 border-b border-border/40">
-            <h2 className="font-serif font-semibold text-lg text-heading">
-              {selectedDate ? formatDate(selectedDate) : 'Todos os Eventos'}
-            </h2>
+            <h3 className="font-serif font-bold text-base sm:text-lg text-heading flex items-center gap-2">
+              <CalendarIcon className="w-4 h-4 text-primary" />
+              {selectedDate ? formatDate(selectedDate.toISOString()) : 'Selecione um dia'}
+            </h3>
             <span className="text-xs text-muted-foreground font-mono">
-              {dayEvents.length} {dayEvents.length === 1 ? 'evento' : 'eventos'}
+              {eventsForSelectedDate.length} evento(s) • {financesForSelectedDate.length}{' '}
+              recebimento(s)
             </span>
           </div>
 
-          {dayEvents.length === 0 ? (
-            <div className="text-center py-12 px-4 rounded-xl border border-dashed border-border/80 bg-muted/10">
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3 text-muted-foreground">
-                <CalendarDays className="w-5 h-5" />
-              </div>
-              <p className="text-sm font-medium text-foreground">
-                Nenhum compromisso para este dia
+          {eventsForSelectedDate.length === 0 && financesForSelectedDate.length === 0 ? (
+            <div className="p-8 text-center bg-card rounded-xl border border-dashed border-border/80 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Nenhum compromisso ou recebimento agendado para esta data.
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Selecione outro dia ou agende um novo evento para este dia.
-              </p>
-              <div className="mt-4">
-                <EventFormDialog
-                  defaultDate={selectedDate}
-                  triggerAsChild={
-                    <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                      <Plus className="w-3.5 h-3.5" /> Agendar nesta data
-                    </Button>
-                  }
-                />
+              <div className="flex justify-center gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setQuoteToEdit(null)
+                    setIsQuoteFormOpen(true)
+                  }}
+                  className="text-xs h-8"
+                >
+                  Criar Orçamento
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEventToEdit(null)
+                    setIsDialogOpen(true)
+                  }}
+                  className="text-xs h-8"
+                >
+                  Adicionar Evento
+                </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-3">
-              {dayEvents.map((event) => {
-                const client = clients.find((c) => c.id === event.clientId)
+              {/* 1. Events for the day */}
+              {eventsForSelectedDate.map((ev) => {
+                const client = clients.find((c) => c.id === ev.clientId)
+                const isPreReservation =
+                  ev.status === 'Pré-reserva' || ev.eventType === 'pre_reservation'
+                const isConfirmed = ev.status === 'Confirmado'
+                const linkedQuote = ev.quoteId ? quotes.find((q) => q.id === ev.quoteId) : null
+
                 return (
-                  <Card
-                    key={event.id}
-                    className="border border-border/60 shadow-xs hover:border-primary/40 transition-colors"
+                  <div
+                    key={ev.id}
+                    className={`p-4 rounded-xl border transition-all shadow-xs flex flex-col justify-between space-y-2.5 ${
+                      isConfirmed
+                        ? 'border-red-500/40 bg-red-500/5 hover:border-red-500/70'
+                        : isPreReservation
+                          ? 'border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500/70'
+                          : 'border-border/70 bg-card'
+                    }`}
                   >
-                    <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="space-y-1.5 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              event.status === 'Confirmado'
-                                ? 'default'
-                                : event.status === 'Concluído'
-                                  ? 'outline'
-                                  : 'secondary'
-                            }
-                            className="text-[10px] font-sans"
-                          >
-                            {event.status}
-                          </Badge>
-                          <h3 className="font-serif font-semibold text-base text-foreground">
-                            {event.title}
-                          </h3>
+                          <span
+                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                              isConfirmed
+                                ? 'bg-red-600'
+                                : isPreReservation
+                                  ? 'bg-emerald-500'
+                                  : 'bg-zinc-400'
+                            }`}
+                          />
+                          <h4 className="font-serif font-bold text-base text-foreground">
+                            {ev.title}
+                          </h4>
                         </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
-                          {client && (
-                            <span className="flex items-center gap-1 text-foreground/80 font-medium">
-                              <User className="w-3.5 h-3.5 text-muted-foreground" />
-                              {client.name}
-                            </span>
-                          )}
-                          {event.time && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5" />
-                              {event.time}
-                            </span>
-                          )}
-                          {event.location && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3.5 h-3.5" />
-                              {event.location}
-                            </span>
-                          )}
-                        </div>
+
+                        <p className="text-xs text-muted-foreground">
+                          Cliente:{' '}
+                          <strong className="text-foreground">{client?.name || 'Cliente'}</strong>
+                          {client?.phone && ` • ${client.phone}`}
+                        </p>
                       </div>
 
-                      <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-0 pt-3 sm:pt-0 border-border/40">
-                        <div className="text-right">
-                          <span className="text-xs text-muted-foreground block">
-                            Valor Previsto
-                          </span>
-                          <span className="font-serif font-bold text-foreground">
-                            {formatCurrency(event.value)}
-                          </span>
-                        </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Badge
+                          variant={isConfirmed ? 'default' : 'outline'}
+                          className={
+                            isConfirmed
+                              ? 'bg-red-600 text-white border-transparent text-[10px]'
+                              : isPreReservation
+                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/40 text-[10px]'
+                                : 'text-[10px]'
+                          }
+                        >
+                          {isConfirmed
+                            ? 'Confirmado'
+                            : isPreReservation
+                              ? 'Pré-reserva'
+                              : ev.status}
+                        </Badge>
 
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="w-4 h-4" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground"
+                            >
+                              <MoreVertical className="w-3.5 h-3.5" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="text-xs">
+                            {ev.quoteId && (
+                              <DropdownMenuItem
+                                onClick={() => handleOpenEventFromQuote(ev.quoteId!)}
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 mr-2" /> Abrir Orçamento
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
-                              onClick={() => handleEdit(event)}
-                              className="gap-2 cursor-pointer"
+                              onClick={() => {
+                                setEventToEdit(ev)
+                                setIsDialogOpen(true)
+                              }}
                             >
-                              <Edit2 className="w-3.5 h-3.5" /> Editar Evento
+                              <Edit className="w-3.5 h-3.5 mr-2" /> Editar Evento
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => setEventToDelete(event)}
-                              className="gap-2 text-destructive cursor-pointer"
+                              onClick={() => handleDelete(ev.id)}
+                              className="text-destructive"
                             >
-                              <Trash2 className="w-3.5 h-3.5" /> Excluir Evento
+                              <Trash2 className="w-3.5 h-3.5 mr-2" /> Excluir
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground pt-1 border-t border-border/40">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <span>
+                          {ev.time || '09:00'}
+                          {ev.endTime ? ` até ${ev.endTime}` : ''}
+                          {ev.endDate && ev.endDate.split('T')[0] !== ev.date.split('T')[0] && (
+                            <span className="text-[10px] ml-1 text-primary">
+                              (término {formatShortDate(ev.endDate)})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+
+                      {ev.location && (
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <span className="truncate">{ev.location}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Touch card opens quote */}
+                    {linkedQuote && (
+                      <div
+                        onClick={() => handleOpenEventFromQuote(ev.quoteId!)}
+                        className="mt-1 p-2 bg-background/80 rounded-lg border border-border/50 text-xs flex items-center justify-between cursor-pointer hover:border-primary/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-3.5 h-3.5 text-primary" />
+                          <span className="font-mono text-muted-foreground">
+                            {linkedQuote.number}
+                          </span>
+                          <span className="font-medium text-foreground">
+                            Total: {formatCurrency(linkedQuote.total)}
+                          </span>
+                        </div>
+                        <span className="text-primary text-[11px] font-medium flex items-center gap-1">
+                          Ver proposta <ExternalLink className="w-3 h-3" />
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* 2. Receivable installments for the day */}
+              {financesForSelectedDate.map((fin) => {
+                const client = clients.find((c) => c.id === fin.clientId)
+                const isPaid = fin.status === 'Pago'
+                const isOverdue = fin.status === 'Atrasado'
+
+                return (
+                  <div
+                    key={fin.id}
+                    onClick={() => navigate('/financial')}
+                    className={`p-3.5 rounded-xl border cursor-pointer hover:border-primary/50 transition-all flex items-center justify-between text-xs shadow-xs ${
+                      isPaid
+                        ? 'bg-muted/40 border-border/60 text-muted-foreground'
+                        : 'bg-blue-500/5 border-blue-500/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                          isPaid
+                            ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                            : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                        }`}
+                      >
+                        <DollarSign className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-foreground flex items-center gap-2">
+                          <span>{fin.title}</span>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] py-0 px-1.5 ${
+                              isPaid
+                                ? 'bg-zinc-200/50 text-zinc-700 dark:text-zinc-300'
+                                : 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30'
+                            }`}
+                          >
+                            {isPaid ? 'Recebido' : fin.status}
+                          </Badge>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          {client ? `Cliente: ${client.name} • ` : ''}
+                          Vencimento: {formatShortDate(fin.dueDate)}
+                          {fin.paymentMethod && ` via ${fin.paymentMethod}`}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="font-serif font-bold text-sm text-foreground">
+                        {formatCurrency(fin.value)}
+                      </span>
+                      <span className="block text-[10px] text-muted-foreground">
+                        Abrir financeiro
+                      </span>
+                    </div>
+                  </div>
                 )
               })}
             </div>
           )}
         </div>
       </div>
+
+      {/* Dialog for event creation/edit */}
+      <EventFormDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        eventToEdit={eventToEdit}
+      />
+
+      {/* Quote form and preview dialogs */}
+      <QuoteFormSheet
+        open={isQuoteFormOpen}
+        onOpenChange={setIsQuoteFormOpen}
+        quoteToEdit={quoteToEdit}
+      />
+
+      <QuotePreviewDialog
+        open={!!quoteToPreview}
+        onOpenChange={(op) => !op && setQuoteToPreview(null)}
+        quote={quoteToPreview}
+        client={clients.find((c) => c.id === quoteToPreview?.clientId)}
+        onEdit={(q) => {
+          setQuoteToEdit(q)
+          setIsQuoteFormOpen(true)
+        }}
+      />
     </div>
   )
 }
+export default Agenda

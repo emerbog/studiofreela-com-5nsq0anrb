@@ -39,6 +39,7 @@ import {
   Users,
 } from 'lucide-react'
 import { ClientFormSheet } from '@/components/ClientFormSheet'
+import { QuoteFormSheet } from '@/components/QuoteFormSheet'
 import { Client } from '@/types'
 
 export default function Clients() {
@@ -47,6 +48,8 @@ export default function Clients() {
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null)
+  const [quoteForClientId, setQuoteForClientId] = useState<string>('')
+  const [isQuoteOpen, setIsQuoteOpen] = useState(false)
 
   const filteredClients = clients.filter((c) => {
     const q = searchTerm.toLowerCase()
@@ -218,6 +221,15 @@ export default function Clients() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
+                            onClick={() => {
+                              setQuoteForClientId(client.id)
+                              setIsQuoteOpen(true)
+                            }}
+                            className="gap-2 cursor-pointer font-medium text-primary"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-primary" /> Novo Orçamento
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             onClick={() => handleEdit(client)}
                             className="gap-2 cursor-pointer"
                           >
@@ -239,6 +251,12 @@ export default function Clients() {
           )}
         </CardContent>
       </Card>
+
+      <QuoteFormSheet
+        open={isQuoteOpen}
+        onOpenChange={setIsQuoteOpen}
+        quoteToEdit={quoteForClientId ? ({ clientId: quoteForClientId } as any) : null}
+      />
     </div>
   )
 }

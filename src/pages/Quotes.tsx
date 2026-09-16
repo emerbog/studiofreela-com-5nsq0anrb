@@ -1,21 +1,15 @@
-import React, { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useAppData } from '@/hooks/use-app-data'
-import { Card, CardContent } from '@/components/ui/card'
+import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import {
   AlertDialog,
@@ -28,231 +22,484 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  FileText,
   Plus,
+  Search,
+  MoreVertical,
+  FileDown,
+  Edit,
+  Trash2,
+  FileCheck,
   Eye,
   CheckCircle,
-  XCircle,
-  MoreHorizontal,
-  Send,
-  Trash2,
+  Share2,
+  Calendar,
+  Clock,
   Sparkles,
+  MapPin,
+  XCircle,
 } from 'lucide-react'
-import { formatCurrency, formatShortDate } from '@/lib/formatters'
+import { formatCurrency, formatDate, formatShortDate } from '@/lib/formatters'
+import { Quote, QuoteStatus } from '@/types'
 import { QuoteFormSheet } from '@/components/QuoteFormSheet'
 import { QuotePreviewDialog } from '@/components/QuotePreviewDialog'
-import { Quote } from '@/types'
+import { exportQuoteToPdf, shareQuotePdf } from '@/lib/quote-pdf'
+import { toast } from 'sonner'
 
-export default function Quotes() {
-  const { quotes, clients, updateQuote, deleteQuote, currentTier } = useAppData()
-  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null)
-  const [quoteToDelete, setQuoteToDelete] = useState<Quote | null>(null)
+export function Quotes() {
+  const { quotes, clients, updateQuote, deleteQuote } = useAppData()
+  const { user } = useAuth()
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('todos')
+  const [quoteToEdit, setQuoteToEdit] = useState<Quote | null>(null)
+  const [quoteToPreview, setQuoteToPreview] = useState<Quote | null>(null)
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [quoteToDelete, setQuoteToDelete] = useState<string | null>(null)
 
-  const isEconomy = currentTier === 'economy'
-
-  const handleUpdateStatus = async (quote: Quote, newStatus: Quote['status']) => {
-    await updateQuote(quote.id, { status: newStatus })
+  const handleOpenNew = () => {
+    setQuoteToEdit(null)
+    setIsFormOpen(true)
   }
 
-  const handleDeleteConfirm = async () => {
+  const handleOpenEdit = (quote: Quote) => {
+    setQuoteToEdit(quote)
+    setIsFormOpen(true)
+  }
+
+  const handleConfirmQuote = async (quote: Quote) => {
+    const ok = await updateQuote(quote.id, {
+      status: 'Confirmado',
+      statusHistory: [
+        ...(quote.statusHistory || []),
+        {
+          status: 'Confirmado',
+          timestamp: new Date().toISOString(),
+          note: 'Confirmado manualmente pelo usuário',
+        },
+      ],
+    })
+    if (ok) {
+      toast.success(`Orçamento ${quote.number} confirmado!`, {
+        description: 'O evento mudou para vermelho na agenda e os recebíveis agora são pendentes.',
+      })
+    }
+  }
+
+  const handleChangeStatus = async (quote: Quote, newStatus: QuoteStatus) => {
+    const ok = await updateQuote(quote.id, {
+      status: newStatus,
+      statusHistory: [
+        ...(quote.statusHistory || []),
+        {
+          status: newStatus,
+          timestamp: new Date().toISOString(),
+          note: `Status alterado para ${newStatus}`,
+        },
+      ],
+    })
+    if (ok) {
+      toast.success(`Status alterado para "${newStatus}" com sucesso!`)
+    }
+  }
+
+  const handleDelete = async () => {
     if (quoteToDelete) {
-      await deleteQuote(quoteToDelete.id)
+      await deleteQuote(quoteToDelete)
       setQuoteToDelete(null)
     }
   }
 
+  const filteredQuotes = useMemo(() => {
+    return quotes.filter((quote) => {
+      const client = clients.find((c) => c.id === quote.clientId)
+      const clientName = client?.name?.toLowerCase() || ''
+      const tradeName = client?.tradeName?.toLowerCase() || ''
+      const eventName = quote.eventName?.toLowerCase() || ''
+      const number = quote.number?.toLowerCase() || ''
+      const q = searchTerm.toLowerCase()
+
+      const matchesSearch =
+        clientName.includes(q) ||
+        tradeName.includes(q) ||
+        eventName.includes(q) ||
+        number.includes(q)
+
+      let matchesStatus = true
+      if (statusFilter !== 'todos') {
+        if (statusFilter === 'Confirmado') {
+          matchesStatus = quote.status === 'Confirmado' || quote.status === 'Aprovado'
+        } else {
+          matchesStatus = quote.status === statusFilter
+        }
+      }
+
+      return matchesSearch && matchesStatus
+    })
+  }, [quotes, clients, searchTerm, statusFilter])
+
+  // Count summaries
+  const stats = useMemo(() => {
+    const totalCount = quotes.length
+    const preReservationCount = quotes.filter((q) => q.status === 'Enviado').length
+    const confirmedCount = quotes.filter(
+      (q) => q.status === 'Confirmado' || q.status === 'Aprovado',
+    ).length
+    const draftCount = quotes.filter((q) => q.status === 'Rascunho').length
+    return { totalCount, preReservationCount, confirmedCount, draftCount }
+  }, [quotes])
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <QuotePreviewDialog
-        quote={selectedQuote}
-        open={!!selectedQuote}
-        onOpenChange={(open) => !open && setSelectedQuote(null)}
+    <div className="space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-tight text-heading">
+            Orçamentos
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Crie propostas comerciais, sincronize datas na agenda e organize pagamentos
+          </p>
+        </div>
+        <Button onClick={handleOpenNew} className="gap-2 shadow-sm shrink-0">
+          <Plus className="w-4 h-4" /> Novo Orçamento
+        </Button>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div
+          onClick={() => setStatusFilter('todos')}
+          className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+            statusFilter === 'todos'
+              ? 'border-primary bg-primary/5 shadow-xs'
+              : 'border-border/60 bg-card hover:border-border'
+          }`}
+        >
+          <span className="text-[11px] text-muted-foreground uppercase font-mono">Total</span>
+          <div className="text-xl sm:text-2xl font-serif font-bold text-foreground mt-1">
+            {stats.totalCount}
+          </div>
+          <span className="text-[11px] text-muted-foreground">Emitidos no app</span>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter('Enviado')}
+          className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+            statusFilter === 'Enviado'
+              ? 'border-emerald-500 bg-emerald-500/10 shadow-xs'
+              : 'border-border/60 bg-card hover:border-border'
+          }`}
+        >
+          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 uppercase font-mono font-medium">
+            Pré-reservas (Verde)
+          </span>
+          <div className="text-xl sm:text-2xl font-serif font-bold text-emerald-700 dark:text-emerald-300 mt-1">
+            {stats.preReservationCount}
+          </div>
+          <span className="text-[11px] text-muted-foreground">Aguardando aceite</span>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter('Confirmado')}
+          className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+            statusFilter === 'Confirmado'
+              ? 'border-red-500 bg-red-500/10 shadow-xs'
+              : 'border-border/60 bg-card hover:border-border'
+          }`}
+        >
+          <span className="text-[11px] text-red-600 dark:text-red-400 uppercase font-mono font-medium">
+            Confirmados (Vermelho)
+          </span>
+          <div className="text-xl sm:text-2xl font-serif font-bold text-red-700 dark:text-red-400 mt-1">
+            {stats.confirmedCount}
+          </div>
+          <span className="text-[11px] text-muted-foreground">Eventos confirmados</span>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter('Rascunho')}
+          className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+            statusFilter === 'Rascunho'
+              ? 'border-border bg-muted/60 shadow-xs'
+              : 'border-border/60 bg-card hover:border-border'
+          }`}
+        >
+          <span className="text-[11px] text-muted-foreground uppercase font-mono">Rascunhos</span>
+          <div className="text-xl sm:text-2xl font-serif font-bold text-muted-foreground mt-1">
+            {stats.draftCount}
+          </div>
+          <span className="text-[11px] text-muted-foreground">Não sincronizados</span>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3 rounded-xl border border-border/60">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por cliente, evento ou número..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 h-9 text-xs"
+          />
+        </div>
+
+        {/* Quick status tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 text-xs">
+          {[
+            { id: 'todos', label: 'Todos' },
+            { id: 'Enviado', label: 'Pré-reserva' },
+            { id: 'Confirmado', label: 'Confirmado' },
+            { id: 'Rascunho', label: 'Rascunho' },
+            { id: 'Rejeitado', label: 'Rejeitado' },
+            { id: 'Cancelado', label: 'Cancelado' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id)}
+              className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors ${
+                statusFilter === tab.id
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* List / Cards mobile-first */}
+      {filteredQuotes.length === 0 ? (
+        <div className="p-12 text-center bg-card rounded-2xl border border-dashed border-border/80 space-y-3">
+          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <h3 className="font-serif font-semibold text-lg text-heading">
+            Nenhum orçamento encontrado
+          </h3>
+          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+            {searchTerm || statusFilter !== 'todos'
+              ? 'Tente ajustar os filtros ou termo de pesquisa.'
+              : 'Crie seu primeiro orçamento completo com cronograma, serviços e condições de pagamento.'}
+          </p>
+          <Button onClick={handleOpenNew} className="gap-2 text-xs">
+            <Plus className="w-4 h-4" /> Criar Orçamento Agora
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {filteredQuotes.map((quote) => {
+            const client = clients.find((c) => c.id === quote.clientId)
+            const isConfirmed = quote.status === 'Confirmado' || quote.status === 'Aprovado'
+            const isPreReservation = quote.status === 'Enviado'
+
+            return (
+              <div
+                key={quote.id}
+                className="p-4 bg-card rounded-xl border border-border/70 hover:border-primary/40 transition-all flex flex-col justify-between space-y-3 shadow-xs"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-xs font-semibold text-primary">
+                        {quote.number}
+                      </span>
+                      <span className="text-muted-foreground text-xs">•</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatShortDate(quote.date)}
+                      </span>
+                    </div>
+
+                    <Badge
+                      variant={isConfirmed ? 'default' : isPreReservation ? 'outline' : 'secondary'}
+                      className={
+                        isConfirmed
+                          ? 'bg-red-600 hover:bg-red-700 text-white border-transparent text-[10px]'
+                          : isPreReservation
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 text-[10px]'
+                            : 'text-[10px]'
+                      }
+                    >
+                      {isConfirmed ? 'Confirmado' : isPreReservation ? 'Pré-reserva' : quote.status}
+                    </Badge>
+                  </div>
+
+                  <h3 className="font-serif font-bold text-base text-foreground mt-1 line-clamp-1">
+                    {quote.eventName || 'Serviço sob demanda'}
+                  </h3>
+
+                  <p className="text-xs text-muted-foreground font-medium mt-0.5 line-clamp-1">
+                    Cliente:{' '}
+                    <strong className="text-foreground">{client?.name || 'Cliente'}</strong>
+                  </p>
+
+                  <div className="space-y-1 text-xs text-muted-foreground mt-2 pt-2 border-t border-border/40">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 shrink-0 text-primary" />
+                      <span className="truncate">
+                        {quote.eventStartDate
+                          ? `${formatShortDate(quote.eventStartDate)} às ${quote.eventStartTime || '09:00'}`
+                          : formatDate(quote.date)}
+                      </span>
+                    </div>
+
+                    {quote.eventLocation && (
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{quote.eventLocation}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-border/40 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase font-mono block">
+                      Total
+                    </span>
+                    <span className="text-base font-serif font-bold text-foreground">
+                      {formatCurrency(quote.total)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setQuoteToPreview(quote)}
+                      title="Visualizar Proposta"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => exportQuoteToPdf(quote, client, user, 'download')}
+                      title="Baixar PDF"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    >
+                      <FileDown className="w-4 h-4" />
+                    </Button>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44 text-xs">
+                        <DropdownMenuItem onClick={() => setQuoteToPreview(quote)}>
+                          <Eye className="w-3.5 h-3.5 mr-2" /> Visualizar Proposta
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => exportQuoteToPdf(quote, client, user, 'download')}
+                        >
+                          <FileDown className="w-3.5 h-3.5 mr-2" /> Baixar PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => shareQuotePdf(quote, client, user)}>
+                          <Share2 className="w-3.5 h-3.5 mr-2" /> Compartilhar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenEdit(quote)}>
+                          <Edit className="w-3.5 h-3.5 mr-2" /> Editar Orçamento
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator />
+
+                        {!isConfirmed && (
+                          <DropdownMenuItem
+                            onClick={() => handleConfirmQuote(quote)}
+                            className="text-red-600 font-medium"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5 mr-2" /> Confirmar (Vermelho)
+                          </DropdownMenuItem>
+                        )}
+
+                        {quote.status !== 'Enviado' && (
+                          <DropdownMenuItem
+                            onClick={() => handleChangeStatus(quote, 'Enviado')}
+                            className="text-emerald-600"
+                          >
+                            <Calendar className="w-3.5 h-3.5 mr-2" /> Pré-reserva (Verde)
+                          </DropdownMenuItem>
+                        )}
+
+                        {quote.status !== 'Cancelado' && (
+                          <DropdownMenuItem
+                            onClick={() => handleChangeStatus(quote, 'Cancelado')}
+                            className="text-muted-foreground"
+                          >
+                            <XCircle className="w-3.5 h-3.5 mr-2" /> Cancelar
+                          </DropdownMenuItem>
+                        )}
+
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setQuoteToDelete(quote.id)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-2" /> Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Form Sheet / Dialog */}
+      <QuoteFormSheet
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        quoteToEdit={quoteToEdit}
+        onSuccess={() => {
+          setIsFormOpen(false)
+          setQuoteToEdit(null)
+        }}
       />
 
-      {/* Delete confirmation dialog */}
-      <AlertDialog open={!!quoteToDelete} onOpenChange={(open) => !open && setQuoteToDelete(null)}>
+      {/* Preview Dialog */}
+      <QuotePreviewDialog
+        open={!!quoteToPreview}
+        onOpenChange={(op) => !op && setQuoteToPreview(null)}
+        quote={quoteToPreview}
+        client={clients.find((c) => c.id === quoteToPreview?.clientId)}
+        onEdit={(q) => handleOpenEdit(q)}
+        onConfirm={(q) => handleConfirmQuote(q)}
+      />
+
+      {/* Delete alert */}
+      <AlertDialog open={!!quoteToDelete} onOpenChange={(op) => !op && setQuoteToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-serif">
-              Confirmar exclusão de orçamento
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir o orçamento{' '}
-              <strong className="text-foreground">{quoteToDelete?.number}</strong>? Esta ação é
-              irreversível.
+            <AlertDialogTitle className="font-serif">Excluir este orçamento?</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs">
+              Esta ação removerá o orçamento e desvinculará os compromissos associados na agenda e
+              títulos previstos não pagos. Tem certeza?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
-              Excluir Orçamento
+              Sim, Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-serif font-bold tracking-tight text-heading">
-            Orçamentos & Propostas
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Gere propostas comerciais em PDF com discriminação de itens e valores.
-          </p>
-        </div>
-        <QuoteFormSheet />
-      </div>
-
-      {isEconomy && (
-        <Card className="border border-amber-500/40 bg-amber-500/5">
-          <CardContent className="p-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-[#b07d4f]/20 flex items-center justify-center text-[#b07d4f] shrink-0">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-serif font-semibold text-sm text-foreground">
-                  Recurso dos Planos Intermediate e Advanced
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Seu plano atual é o Economy. Faça upgrade para gerar e emitir propostas formais em
-                  PDF com sua marca.
-                </p>
-              </div>
-            </div>
-            <QuoteFormSheet
-              triggerAsChild={
-                <Button size="sm" variant="outline" className="text-xs shrink-0">
-                  Ver Formulário
-                </Button>
-              }
-            />
-          </CardContent>
-        </Card>
-      )}
-
-      <Card className="border border-border/60 shadow-xs">
-        <CardContent className="p-0">
-          {quotes.length === 0 ? (
-            <div className="text-center py-16 px-4">
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3 text-muted-foreground">
-                <FileText className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-serif font-semibold text-foreground">
-                Nenhum orçamento emitido
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                Crie propostas personalizadas para seus clientes com cálculo automático de totais.
-              </p>
-              <div className="mt-4">
-                <QuoteFormSheet />
-              </div>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="font-serif">Número</TableHead>
-                  <TableHead className="font-serif">Cliente</TableHead>
-                  <TableHead className="font-serif">Data de Emissão</TableHead>
-                  <TableHead className="font-serif">Total Previsto</TableHead>
-                  <TableHead className="font-serif">Situação</TableHead>
-                  <TableHead className="text-right font-serif">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {quotes.map((quote) => {
-                  const client = clients.find((c) => c.id === quote.clientId)
-                  return (
-                    <TableRow key={quote.id} className="hover:bg-muted/40 transition-colors">
-                      <TableCell className="font-mono text-xs font-semibold text-foreground">
-                        {quote.number}
-                      </TableCell>
-                      <TableCell className="font-medium text-foreground">
-                        {client ? client.name : '—'}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {formatShortDate(quote.date)}
-                      </TableCell>
-                      <TableCell className="font-serif font-semibold text-foreground">
-                        {formatCurrency(quote.total)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            quote.status === 'Aprovado'
-                              ? 'default'
-                              : quote.status === 'Rejeitado'
-                                ? 'destructive'
-                                : quote.status === 'Enviado'
-                                  ? 'secondary'
-                                  : 'outline'
-                          }
-                          className="text-[10px] font-sans"
-                        >
-                          {quote.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="inline-flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setSelectedQuote(quote)}
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                            title="Visualizar proposta"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </Button>
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="w-3.5 h-3.5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => handleUpdateStatus(quote, 'Enviado')}
-                                className="gap-2 cursor-pointer"
-                              >
-                                <Send className="w-3.5 h-3.5 text-blue-600" /> Marcar como Enviado
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleUpdateStatus(quote, 'Aprovado')}
-                                className="gap-2 cursor-pointer"
-                              >
-                                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Marcar como
-                                Aprovado
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleUpdateStatus(quote, 'Rejeitado')}
-                                className="gap-2 cursor-pointer"
-                              >
-                                <XCircle className="w-3.5 h-3.5 text-amber-600" /> Marcar como
-                                Rejeitado
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => setQuoteToDelete(quote)}
-                                className="gap-2 text-destructive cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" /> Excluir Orçamento
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }
+export default Quotes

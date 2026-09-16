@@ -21,13 +21,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Plus, Loader2 } from 'lucide-react'
-import { AppEvent } from '@/types'
+import { AppEvent, EventStatus } from '@/types'
 import { toast } from 'sonner'
+import { ClientSelector } from '@/components/ClientSelector'
 
 interface EventFormDialogProps {
   triggerAsChild?: React.ReactNode
-  defaultDate?: Date
   eventToEdit?: AppEvent | null
+  defaultDate?: Date
   open?: boolean
   onOpenChange?: (open: boolean) => void
   onSuccess?: () => void
@@ -35,8 +36,8 @@ interface EventFormDialogProps {
 
 export function EventFormDialog({
   triggerAsChild,
-  defaultDate,
   eventToEdit,
+  defaultDate,
   open: controlledOpen,
   onOpenChange: setControlledOpen,
   onSuccess,
@@ -55,9 +56,8 @@ export function EventFormDialog({
     time: '',
     location: '',
     value: '',
-    status: 'Confirmado' as 'Confirmado' | 'Pendente' | 'Concluído',
+    status: 'Confirmado' as EventStatus,
   })
-
   useEffect(() => {
     if (eventToEdit) {
       setFormData({
@@ -180,31 +180,12 @@ export function EventFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="event-client" className="text-xs font-medium">
-              Cliente *
-            </Label>
-            <Select
-              required
+            <Label className="text-xs font-medium">Cliente *</Label>
+            <ClientSelector
               value={formData.clientId}
-              onValueChange={(v) => setFormData({ ...formData, clientId: v })}
-            >
-              <SelectTrigger id="event-client">
-                <SelectValue placeholder="Selecione um cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.length === 0 ? (
-                  <SelectItem value="none" disabled>
-                    Nenhum cliente cadastrado ainda
-                  </SelectItem>
-                ) : (
-                  clients.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+              onChange={(clientId) => setFormData({ ...formData, clientId })}
+              showEditButton={false}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -278,10 +259,12 @@ export function EventFormDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Confirmado">Confirmado</SelectItem>
+                <SelectItem value="Confirmado">Confirmado (Vermelho)</SelectItem>
+                <SelectItem value="Pré-reserva">Pré-reserva (Verde)</SelectItem>
                 <SelectItem value="Pendente">Pendente</SelectItem>
                 <SelectItem value="Concluído">Concluído</SelectItem>
-              </SelectContent>
+                <SelectItem value="Cancelado">Cancelado</SelectItem>
+              </SelectContent>{' '}
             </Select>
           </div>
 
