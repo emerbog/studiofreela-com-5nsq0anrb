@@ -32,7 +32,9 @@ export const appDataService = {
   },
 
   async createClient(data: Omit<Client, 'id' | 'createdAt'>): Promise<Client> {
+    const currentUserId = pb.authStore.model?.id || ''
     const record = await pb.collection('clients').create({
+      user: currentUserId,
       name: data.name,
       tradeName: data.tradeName || null,
       clientType: data.clientType || 'PF',
@@ -106,7 +108,9 @@ export const appDataService = {
   },
 
   async createEvent(data: Omit<AppEvent, 'id'>): Promise<AppEvent> {
+    const currentUserId = pb.authStore.model?.id || ''
     const record = await pb.collection('events').create({
+      user: currentUserId,
       client: data.clientId,
       quote: data.quoteId || null,
       title: data.title,
@@ -191,7 +195,12 @@ export const appDataService = {
   },
 
   async createFinance(data: Omit<Finance, 'id'>): Promise<Finance> {
+    const currentUserId = pb.authStore.model?.id || ''
+    if (!currentUserId) {
+      throw new Error('Usuário não autenticado para criar registro financeiro.')
+    }
     const record = await pb.collection('finances').create({
+      user: currentUserId,
       client: data.clientId || null,
       event: data.eventId || null,
       quote: data.quoteId || null,
@@ -220,6 +229,10 @@ export const appDataService = {
 
   async updateFinance(id: string, data: Partial<Omit<Finance, 'id'>>): Promise<Finance> {
     const payload: any = { ...data }
+    const currentUserId = pb.authStore.model?.id
+    if (currentUserId) {
+      payload.user = currentUserId
+    }
     if (data.clientId !== undefined) {
       payload.client = data.clientId || null
       delete payload.clientId
@@ -279,22 +292,51 @@ export const appDataService = {
       paymentSchedule: r.paymentSchedule || [],
       priceSummary: r.priceSummary || undefined,
       total: Number(r.total) || 0,
+      syncStatus: r.syncStatus || undefined,
+      lastSyncAt: r.lastSyncAt || undefined,
+      syncError: r.syncError || undefined,
       statusHistory: r.statusHistory || [],
       pdfHistory: r.pdfHistory || [],
     }))
   },
 
   async createQuote(data: Omit<Quote, 'id' | 'number'> & { number?: string }): Promise<Quote> {
+    const currentUserId = pb.authStore.model?.id || ''
     const existing = await pb.collection('quotes').getList(1, 1, { sort: '-created' })
     const seq = (existing.totalItems + 1).toString().padStart(3, '0')
     const number = data.number || `ORC-${seq}`
 
+    // Regra: O salvamento de um orçamento completo com data e horário válidos
+    // define automaticamente o status para Pré-reserva (Enviado) caso não seja Confirmado
+    let initialStatus = data.status
+    const hasValidSchedule = !!(
+      (data.eventStartDate || data.date) &&
+      data.eventName &&
+      data.eventName.trim().length > 0
+    )
+    if (
+      initialStatus !== 'Confirmado' &&
+      initialStatus !== 'Aprovado' &&
+      initialStatus !== 'Rascunho'
+    ) {
+      initialStatus = 'Enviado' // Pré-reserva
+    } else if (
+      initialStatus === 'Rascunho' &&
+      hasValidSchedule &&
+      data.items &&
+      data.items.length > 0
+    ) {
+      // Orçamento com dados completos não fica preso em rascunho sem pré-reserva
+      initialStatus = 'Enviado'
+    }
+
     const record = await pb.collection('quotes').create({
+      user: currentUserId,
       client: data.clientId,
       number,
       date: data.date,
       validityDays: data.validityDays || 15,
-      status: data.status,
+      status: initialStatus,
       eventName: data.eventName || null,
       eventLocation: data.eventLocation || null,
       eventStartDate: data.eventStartDate || null,
@@ -309,8 +351,11 @@ export const appDataService = {
       paymentSchedule: data.paymentSchedule || null,
       priceSummary: data.priceSummary || null,
       total: data.total,
+      syncStatus: 'pending',
+      lastSyncAt: null,
+      syncError: null,
       statusHistory: data.statusHistory || [
-        { status: data.status, timestamp: new Date().toISOString() },
+        { status: initialStatus, timestamp: new Date().toISOString() },
       ],
       pdfHistory: data.pdfHistory || null,
     })
@@ -336,18 +381,51 @@ export const appDataService = {
       paymentSchedule: record.paymentSchedule || [],
       priceSummary: record.priceSummary || undefined,
       total: Number(record.total) || 0,
+      syncStatus: 'pending',
+      lastSyncAt: undefined,
+      syncError: undefined,
       statusHistory: record.statusHistory || [],
       pdfHistory: record.pdfHistory || [],
     }
 
-    // Auto-sync side effects
-    await this.syncQuoteToAgendaAndFinances(quote)
+    // Auto-sync side effects com persistência do status de sincronização
+    try {
+      await this.syncQuoteToAgendaAndFinances(quote)
+      await pb.collection('quotes').update(quote.id, {
+        syncStatus: 'synced',
+        lastSyncAt: new Date().toISOString(),
+        syncError: null,
+      })
+      quote.syncStatus = 'synced'
+      quote.lastSyncAt = new Date().toISOString()
+      quote.syncError = undefined
+    } catch (syncErr: any) {
+      const errMsg = syncErr?.message || String(syncErr)
+      console.error('[StudioFreela] Erro na sincronização automática do orçamento:', syncErr)
+      await pb
+        .collection('quotes')
+        .update(quote.id, {
+          syncStatus: 'error',
+          lastSyncAt: new Date().toISOString(),
+          syncError: errMsg,
+        })
+        .catch(() => {})
+      quote.syncStatus = 'error'
+      quote.syncError = errMsg
+      throw new Error(
+        `Orçamento salvo, mas a sincronização com Agenda/Financeiro falhou: ${errMsg}`,
+      )
+    }
 
     return quote
   },
 
   async updateQuote(id: string, data: Partial<Omit<Quote, 'id'>>): Promise<Quote> {
     const payload: any = { ...data }
+    const currentUserId = pb.authStore.model?.id
+    if (currentUserId) {
+      payload.user = currentUserId
+    }
     if (data.clientId) {
       payload.client = data.clientId
       delete payload.clientId
@@ -374,12 +452,41 @@ export const appDataService = {
       paymentSchedule: record.paymentSchedule || [],
       priceSummary: record.priceSummary || undefined,
       total: Number(record.total) || 0,
+      syncStatus: record.syncStatus || undefined,
+      lastSyncAt: record.lastSyncAt || undefined,
+      syncError: record.syncError || undefined,
       statusHistory: record.statusHistory || [],
       pdfHistory: record.pdfHistory || [],
     }
 
-    // Auto-sync side effects
-    await this.syncQuoteToAgendaAndFinances(quote)
+    // Auto-sync side effects com rastreamento de falhas
+    try {
+      await this.syncQuoteToAgendaAndFinances(quote)
+      await pb.collection('quotes').update(quote.id, {
+        syncStatus: 'synced',
+        lastSyncAt: new Date().toISOString(),
+        syncError: null,
+      })
+      quote.syncStatus = 'synced'
+      quote.lastSyncAt = new Date().toISOString()
+      quote.syncError = undefined
+    } catch (syncErr: any) {
+      const errMsg = syncErr?.message || String(syncErr)
+      console.error('[StudioFreela] Erro ao sincronizar atualização do orçamento:', syncErr)
+      await pb
+        .collection('quotes')
+        .update(quote.id, {
+          syncStatus: 'error',
+          lastSyncAt: new Date().toISOString(),
+          syncError: errMsg,
+        })
+        .catch(() => {})
+      quote.syncStatus = 'error'
+      quote.syncError = errMsg
+      throw new Error(
+        `Orçamento salvo, mas a sincronização com Agenda/Financeiro falhou: ${errMsg}`,
+      )
+    }
 
     return quote
   },
@@ -416,25 +523,24 @@ export const appDataService = {
 
   // -------------------------------------------------------------
   // SYNC QUOTE WITH AGENDA AND FINANCES (CRITICAL CORE LOGIC)
+  // Idempotente: chave única quoteId para eventos e quoteId + paymentScheduleItemId para parcelas
   // -------------------------------------------------------------
   async syncQuoteToAgendaAndFinances(quote: Quote): Promise<void> {
     const quoteId = quote.id
     const startDate = quote.eventStartDate || quote.date
     const status = quote.status
+    const currentUserId = pb.authStore.model?.id || ''
+
+    if (!currentUserId) {
+      throw new Error('Sessão expirada. Faça login novamente para sincronizar.')
+    }
 
     // 1. Agenda sync for the event
-    // Find existing event linked to this quote
-    let existingEvent: any = null
-    try {
-      const found = await pb.collection('events').getFullList({
-        filter: `quote = "${quoteId}"`,
-      })
-      if (found.length > 0) {
-        existingEvent = found[0]
-      }
-    } catch {
-      /* intentionally ignored */
-    }
+    // Find existing event(s) linked to this quoteId
+    const foundEvents = await pb.collection('events').getFullList({
+      filter: `quote = "${quoteId}"`,
+      sort: 'created',
+    })
 
     const isVisibleInAgenda =
       status === 'Enviado' || status === 'Confirmado' || status === 'Aprovado'
@@ -449,8 +555,11 @@ export const appDataService = {
       const endTime = quote.eventEndTime || ''
       const endDate = quote.eventEndDate || startDate
 
-      if (existingEvent) {
-        await pb.collection('events').update(existingEvent.id, {
+      if (foundEvents.length > 0) {
+        // Atualiza exatamente o primeiro evento
+        const primaryEvent = foundEvents[0]
+        await pb.collection('events').update(primaryEvent.id, {
+          user: currentUserId,
           client: quote.clientId,
           title: eventTitle,
           date: startDate,
@@ -463,8 +572,22 @@ export const appDataService = {
           eventType: eventType,
           notes: quote.notes || '',
         })
+
+        // Idempotência: caso existam duplicatas antigas acidentais, remove as excedentes
+        if (foundEvents.length > 1) {
+          for (let i = 1; i < foundEvents.length; i++) {
+            await pb
+              .collection('events')
+              .delete(foundEvents[i].id)
+              .catch((err) => {
+                console.warn('[StudioFreela] Erro ao limpar evento duplicado excedente:', err)
+              })
+          }
+        }
       } else {
+        // Criação de evento novo vinculado ao quoteId
         await pb.collection('events').create({
+          user: currentUserId,
           quote: quoteId,
           client: quote.clientId,
           title: eventTitle,
@@ -479,35 +602,36 @@ export const appDataService = {
           notes: quote.notes || '',
         })
       }
-    } else if (existingEvent) {
+    } else if (foundEvents.length > 0) {
       // Draft, rejected, canceled, expired: update to Cancelado or remove
-      if (status === 'Rascunho') {
-        // Drafts without pre-reservation must not appear in agenda
-        await pb
-          .collection('events')
-          .delete(existingEvent.id)
-          .catch(() => {})
-      } else {
-        // Rejeitado/Cancelado/Expirado: mark as Cancelado to keep history
-        await pb
-          .collection('events')
-          .update(existingEvent.id, {
-            status: 'Cancelado',
-          })
-          .catch(() => {})
+      for (const ev of foundEvents) {
+        if (status === 'Rascunho') {
+          await pb
+            .collection('events')
+            .delete(ev.id)
+            .catch((err) => {
+              console.warn('[StudioFreela] Erro ao remover evento de rascunho:', err)
+            })
+        } else {
+          await pb
+            .collection('events')
+            .update(ev.id, {
+              user: currentUserId,
+              status: 'Cancelado',
+            })
+            .catch((err) => {
+              console.warn('[StudioFreela] Erro ao cancelar evento vinculado:', err)
+            })
+        }
       }
     }
 
     // 2. Finance sync for installments
-    // Check existing finances for this quote
-    let existingFinances: any[] = []
-    try {
-      existingFinances = await pb.collection('finances').getFullList({
-        filter: `quote = "${quoteId}"`,
-      })
-    } catch {
-      /* intentionally ignored */
-    }
+    // Busca todas as parcelas já vinculadas a este quoteId
+    const existingFinances = await pb.collection('finances').getFullList({
+      filter: `quote = "${quoteId}"`,
+      sort: 'dueDate',
+    })
 
     const schedule = quote.paymentSchedule || []
 
@@ -517,41 +641,35 @@ export const appDataService = {
       status !== 'Cancelado' &&
       status !== 'Rejeitado'
     ) {
+      // Previsto quando pré-reserva (Enviado); Pendente quando Confirmado ou Aprovado
       const financeStatus =
         status === 'Confirmado' || status === 'Aprovado' ? 'Pendente' : 'Previsto'
 
+      // Manter registro de quais ids foram associados para evitar duplicações
+      const processedFinanceIds = new Set<string>()
+
       for (let i = 0; i < schedule.length; i++) {
         const item = schedule[i]
-        const existing = existingFinances.find(
-          (f) =>
-            f.paymentScheduleItemId === item.id ||
-            (!f.paymentScheduleItemId && f.title.includes(`Parcela ${i + 1}`)),
-        )
-
-        const title = `${quote.number} - ${item.description || `Parcela ${i + 1}/${schedule.length}`}`
+        const fallbackTitle = `Parcela ${i + 1}/${schedule.length}`
+        const title = `${quote.number} - ${item.description || fallbackTitle}`
         const dueDate = item.dueDate || startDate
 
+        // Localiza por quoteId + paymentScheduleItemId (ou por fallback de descrição se item legado)
+        const matchedFinances = existingFinances.filter(
+          (f) =>
+            !processedFinanceIds.has(f.id) &&
+            (f.paymentScheduleItemId === item.id ||
+              (!f.paymentScheduleItemId && f.title.includes(`Parcela ${i + 1}`))),
+        )
+
+        const existing = matchedFinances[0]
+
         if (existing) {
-          // If already paid, DO NOT overwrite paid status or paid date
+          processedFinanceIds.add(existing.id)
+          // Se já foi baixado (Pago), preserva status e data de quitação
           if (existing.status !== 'Pago') {
-            await pb
-              .collection('finances')
-              .update(existing.id, {
-                client: quote.clientId,
-                title,
-                value: item.value,
-                dueDate,
-                paymentScheduleItemId: item.id,
-                paymentMethod: item.method,
-                status: financeStatus,
-              })
-              .catch(() => {})
-          }
-        } else {
-          await pb
-            .collection('finances')
-            .create({
-              quote: quoteId,
+            await pb.collection('finances').update(existing.id, {
+              user: currentUserId,
               client: quote.clientId,
               title,
               value: item.value,
@@ -560,14 +678,43 @@ export const appDataService = {
               paymentMethod: item.method,
               status: financeStatus,
             })
-            .catch(() => {})
+          }
+
+          // Se por ventura havia mais de uma duplicata para o mesmo itemId, remove as sobressalentes
+          if (matchedFinances.length > 1) {
+            for (let d = 1; d < matchedFinances.length; d++) {
+              if (matchedFinances[d].status !== 'Pago') {
+                await pb
+                  .collection('finances')
+                  .delete(matchedFinances[d].id)
+                  .catch((err) => {
+                    console.warn('[StudioFreela] Erro ao deletar parcela duplicada excedente:', err)
+                  })
+              }
+            }
+          }
+        } else {
+          // Cria nova parcela com o proprietário explícito autenticado
+          const created = await pb.collection('finances').create({
+            user: currentUserId,
+            quote: quoteId,
+            client: quote.clientId,
+            title,
+            value: item.value,
+            dueDate,
+            paymentScheduleItemId: item.id,
+            paymentMethod: item.method,
+            status: financeStatus,
+          })
+          processedFinanceIds.add(created.id)
         }
       }
 
-      // Remove removed installments that aren't paid
+      // Remover parcelas não pagas que foram excluídas do cronograma
       const scheduleIds = new Set(schedule.map((s) => s.id))
       for (const f of existingFinances) {
         if (
+          !processedFinanceIds.has(f.id) &&
           f.paymentScheduleItemId &&
           !scheduleIds.has(f.paymentScheduleItemId) &&
           f.status !== 'Pago'
@@ -575,26 +722,98 @@ export const appDataService = {
           await pb
             .collection('finances')
             .delete(f.id)
-            .catch(() => {})
+            .catch((err) => {
+              console.warn('[StudioFreela] Erro ao remover parcela excluída:', err)
+            })
         }
       }
     } else if (status === 'Rascunho' || status === 'Cancelado' || status === 'Rejeitado') {
-      // For draft/cancelled quotes, non-paid finances should be removed or marked Cancelado
       for (const f of existingFinances) {
         if (f.status !== 'Pago') {
           if (status === 'Rascunho') {
             await pb
               .collection('finances')
               .delete(f.id)
-              .catch(() => {})
+              .catch((err) => {
+                console.warn('[StudioFreela] Erro ao remover parcela de rascunho:', err)
+              })
           } else {
             await pb
               .collection('finances')
-              .update(f.id, { status: 'Cancelado' })
-              .catch(() => {})
+              .update(f.id, {
+                user: currentUserId,
+                status: 'Cancelado',
+              })
+              .catch((err) => {
+                console.warn('[StudioFreela] Erro ao marcar parcela como cancelada:', err)
+              })
           }
         }
       }
+    }
+  },
+
+  // Reprocessamento / Ressincronização explícita de um orçamento
+  async resyncQuote(quoteId: string): Promise<Quote> {
+    const quoteRecord = await pb.collection('quotes').getOne(quoteId)
+    const quote: Quote = {
+      id: quoteRecord.id,
+      clientId: quoteRecord.client,
+      number: quoteRecord.number,
+      date: quoteRecord.date,
+      validityDays: quoteRecord.validityDays || 15,
+      status: quoteRecord.status,
+      eventName: quoteRecord.eventName || '',
+      eventLocation: quoteRecord.eventLocation || '',
+      eventStartDate: quoteRecord.eventStartDate || '',
+      eventStartTime: quoteRecord.eventStartTime || '',
+      eventEndDate: quoteRecord.eventEndDate || '',
+      eventEndTime: quoteRecord.eventEndTime || '',
+      notes: quoteRecord.notes || '',
+      items: quoteRecord.items || [],
+      equipments: quoteRecord.equipments || [],
+      overtimeRule: quoteRecord.overtimeRule || undefined,
+      logistics: quoteRecord.logistics || undefined,
+      paymentSchedule: quoteRecord.paymentSchedule || [],
+      priceSummary: quoteRecord.priceSummary || undefined,
+      total: Number(quoteRecord.total) || 0,
+      syncStatus: quoteRecord.syncStatus || undefined,
+      lastSyncAt: quoteRecord.lastSyncAt || undefined,
+      syncError: quoteRecord.syncError || undefined,
+      statusHistory: quoteRecord.statusHistory || [],
+      pdfHistory: quoteRecord.pdfHistory || [],
+    }
+
+    try {
+      await this.syncQuoteToAgendaAndFinances(quote)
+      const now = new Date().toISOString()
+      await pb.collection('quotes').update(quote.id, {
+        syncStatus: 'synced',
+        lastSyncAt: now,
+        syncError: null,
+      })
+      quote.syncStatus = 'synced'
+      quote.lastSyncAt = now
+      quote.syncError = undefined
+      return quote
+    } catch (err: any) {
+      const errMsg = err?.message || String(err)
+      console.error('[StudioFreela] Falha no reprocessamento da sincronização:', err)
+      const now = new Date().toISOString()
+      await pb
+        .collection('quotes')
+        .update(quote.id, {
+          syncStatus: 'error',
+          lastSyncAt: now,
+          syncError: errMsg,
+        })
+        .catch(() => {})
+      quote.syncStatus = 'error'
+      quote.lastSyncAt = now
+      quote.syncError = errMsg
+      throw new Error(
+        `Orçamento salvo, mas a sincronização com Agenda/Financeiro falhou: ${errMsg}`,
+      )
     }
   },
 
@@ -618,11 +837,13 @@ export const appDataService = {
   async createContract(
     data: Omit<Contract, 'id' | 'number'> & { number?: string },
   ): Promise<Contract> {
+    const currentUserId = pb.authStore.model?.id || ''
     const existing = await pb.collection('contracts').getList(1, 1, { sort: '-created' })
     const seq = (existing.totalItems + 1).toString().padStart(3, '0')
     const number = data.number || `CTR-${seq}`
 
     const record = await pb.collection('contracts').create({
+      user: currentUserId,
       client: data.clientId,
       quote: data.quoteId || null,
       number,
@@ -645,6 +866,10 @@ export const appDataService = {
 
   async updateContract(id: string, data: Partial<Omit<Contract, 'id'>>): Promise<Contract> {
     const payload: any = { ...data }
+    const currentUserId = pb.authStore.model?.id
+    if (currentUserId) {
+      payload.user = currentUserId
+    }
     if (data.clientId) {
       payload.client = data.clientId
       delete payload.clientId

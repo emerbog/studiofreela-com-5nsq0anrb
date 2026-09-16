@@ -207,6 +207,11 @@ export type Quote = {
 
   total: number
 
+  // Sync status
+  syncStatus?: 'pending' | 'synced' | 'error'
+  lastSyncAt?: string
+  syncError?: string
+
   // Audit
   statusHistory?: StatusHistoryEntry[]
   pdfHistory?: PdfHistoryEntry[]

@@ -46,7 +46,7 @@ import { exportQuoteToPdf, shareQuotePdf } from '@/lib/quote-pdf'
 import { toast } from 'sonner'
 
 export function Quotes() {
-  const { quotes, clients, updateQuote, deleteQuote } = useAppData()
+  const { quotes, clients, updateQuote, deleteQuote, resyncQuote } = useAppData()
   const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('todos')
@@ -54,6 +54,7 @@ export function Quotes() {
   const [quoteToPreview, setQuoteToPreview] = useState<Quote | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [quoteToDelete, setQuoteToDelete] = useState<string | null>(null)
+  const [syncingQuoteId, setSyncingQuoteId] = useState<string | null>(null)
 
   const handleOpenNew = () => {
     setQuoteToEdit(null)
@@ -66,21 +67,36 @@ export function Quotes() {
   }
 
   const handleConfirmQuote = async (quote: Quote) => {
-    const ok = await updateQuote(quote.id, {
-      status: 'Confirmado',
-      statusHistory: [
-        ...(quote.statusHistory || []),
-        {
-          status: 'Confirmado',
-          timestamp: new Date().toISOString(),
-          note: 'Confirmado manualmente pelo usuário',
-        },
-      ],
-    })
-    if (ok) {
-      toast.success(`Orçamento ${quote.number} confirmado!`, {
-        description: 'O evento mudou para vermelho na agenda e os recebíveis agora são pendentes.',
+    setSyncingQuoteId(quote.id)
+    try {
+      const ok = await updateQuote(quote.id, {
+        status: 'Confirmado',
+        statusHistory: [
+          ...(quote.statusHistory || []),
+          {
+            status: 'Confirmado',
+            timestamp: new Date().toISOString(),
+            note: 'Confirmado pelo usuário: evento confirmado na agenda e parcelas pendentes.',
+          },
+        ],
       })
+      if (ok) {
+        toast.success(`Orçamento ${quote.number} confirmado!`, {
+          description:
+            'O evento mudou para vermelho na agenda e os recebíveis agora são pendentes.',
+        })
+      }
+    } finally {
+      setSyncingQuoteId(null)
+    }
+  }
+
+  const handleResyncQuote = async (quote: Quote) => {
+    setSyncingQuoteId(quote.id)
+    try {
+      await resyncQuote(quote.id)
+    } finally {
+      setSyncingQuoteId(null)
     }
   }
 
@@ -328,6 +344,30 @@ export function Quotes() {
                     {quote.eventName || 'Serviço sob demanda'}
                   </h3>
 
+                  {quote.syncStatus === 'error' && (
+                    <div className="mt-1.5 p-2 rounded-md bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-700 dark:text-amber-300 flex items-center justify-between gap-2">
+                      <span
+                        className="truncate"
+                        title={quote.syncError || 'Falha de sincronização'}
+                      >
+                        Sincronização com Agenda/Financeiro falhou.
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={syncingQuoteId === quote.id}
+                        onClick={() => handleResyncQuote(quote)}
+                        className="h-6 px-2 text-[10px] shrink-0 border-amber-500/40 hover:bg-amber-500/20"
+                      >
+                        <RefreshCw
+                          className={`w-3 h-3 mr-1 ${syncingQuoteId === quote.id ? 'animate-spin' : ''}`}
+                        />
+                        Sincronizar novamente
+                      </Button>
+                    </div>
+                  )}
+
                   <p className="text-xs text-muted-foreground font-medium mt-0.5 line-clamp-1">
                     Cliente:{' '}
                     <strong className="text-foreground">{client?.name || 'Cliente'}</strong>
@@ -413,9 +453,22 @@ export function Quotes() {
 
                         <DropdownMenuSeparator />
 
+                        <DropdownMenuItem
+                          onClick={() => handleResyncQuote(quote)}
+                          disabled={syncingQuoteId === quote.id}
+                        >
+                          <RefreshCw
+                            className={`w-3.5 h-3.5 mr-2 ${syncingQuoteId === quote.id ? 'animate-spin' : ''}`}
+                          />
+                          {quote.syncStatus === 'error'
+                            ? 'Sincronizar novamente'
+                            : 'Reprocessar sincronização'}
+                        </DropdownMenuItem>
+
                         {!isConfirmed && (
                           <DropdownMenuItem
                             onClick={() => handleConfirmQuote(quote)}
+                            disabled={syncingQuoteId === quote.id}
                             className="text-red-600 font-medium"
                           >
                             <CheckCircle className="w-3.5 h-3.5 mr-2" /> Confirmar (Vermelho)

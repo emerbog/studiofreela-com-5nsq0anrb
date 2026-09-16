@@ -370,29 +370,45 @@ export function Agenda() {
                 )
               })}
 
-              {/* 2. Receivable installments for the day */}
+              {/* 2. Receivable installments for the day with coin icons */}
               {financesForSelectedDate.map((fin) => {
                 const client = clients.find((c) => c.id === fin.clientId)
                 const isPaid = fin.status === 'Pago'
-                const isOverdue = fin.status === 'Atrasado'
+                const todayStr = new Date().toISOString().split('T')[0]
+                const dueStr = fin.dueDate ? fin.dueDate.split('T')[0] : ''
+                const isOverdue = !isPaid && dueStr && dueStr < todayStr
+                const isForecastOrPending = !isPaid && !isOverdue
+
+                // Coin icon styling per spec:
+                // azul (previsto/pendente), cinza (pago), vermelho discreto (vencido)
+                const iconColorClass = isPaid
+                  ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                  : isOverdue
+                    ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                    : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+
+                const cardBorderClass = isPaid
+                  ? 'bg-muted/40 border-border/60 text-muted-foreground'
+                  : isOverdue
+                    ? 'bg-red-500/5 border-red-500/30'
+                    : 'bg-blue-500/5 border-blue-500/30'
 
                 return (
                   <div
                     key={fin.id}
                     onClick={() => navigate('/financial')}
-                    className={`p-3.5 rounded-xl border cursor-pointer hover:border-primary/50 transition-all flex items-center justify-between text-xs shadow-xs ${
-                      isPaid
-                        ? 'bg-muted/40 border-border/60 text-muted-foreground'
-                        : 'bg-blue-500/5 border-blue-500/30'
-                    }`}
+                    className={`p-3.5 rounded-xl border cursor-pointer hover:border-primary/50 transition-all flex items-center justify-between text-xs shadow-xs ${cardBorderClass}`}
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                        className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${iconColorClass}`}
+                        title={
                           isPaid
-                            ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
-                            : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                        }`}
+                            ? 'Recebível pago (cinza)'
+                            : isOverdue
+                              ? 'Recebível vencido (vermelho)'
+                              : 'Recebível previsto/pendente (azul)'
+                        }
                       >
                         <DollarSign className="w-4 h-4" />
                       </div>
@@ -404,10 +420,12 @@ export function Agenda() {
                             className={`text-[10px] py-0 px-1.5 ${
                               isPaid
                                 ? 'bg-zinc-200/50 text-zinc-700 dark:text-zinc-300'
-                                : 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30'
+                                : isOverdue
+                                  ? 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30'
+                                  : 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30'
                             }`}
                           >
-                            {isPaid ? 'Recebido' : fin.status}
+                            {isPaid ? 'Recebido' : isOverdue ? 'Vencido' : fin.status}
                           </Badge>
                         </div>
                         <div className="text-[11px] text-muted-foreground mt-0.5">

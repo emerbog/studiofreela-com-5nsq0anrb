@@ -11,7 +11,14 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency, formatDate, formatShortDate } from '@/lib/formatters'
-import { exportQuoteToPdf, shareQuotePdf } from '@/lib/quote-pdf'
+import {
+  exportQuoteToPdf,
+  shareQuotePdf,
+  downloadQuoteBinaryPdf,
+  downloadQuoteForGovBr,
+  openGovBrSigner,
+  shareQuotePdfFile,
+} from '@/lib/quote-pdf'
 import {
   Eye,
   FileDown,
@@ -25,6 +32,8 @@ import {
   Sparkles,
   User,
   ArrowRight,
+  ExternalLink,
+  ShieldCheck,
 } from 'lucide-react'
 
 interface QuotePreviewDialogProps {
@@ -259,26 +268,40 @@ export function QuotePreviewDialog({
               ))}
             </div>
           </div>
+
+          {/* Orientações para Assinatura Eletrônica GOV.BR */}
+          <div className="p-3.5 rounded-xl border border-primary/30 bg-primary/5 space-y-2 text-xs">
+            <div className="flex items-center gap-2 text-primary font-semibold">
+              <ShieldCheck className="w-4 h-4 shrink-0" />
+              <span>Preparado para Assinatura Eletrônica Oficial via GOV.BR</span>
+            </div>
+            <p className="text-muted-foreground text-[11px] leading-relaxed">
+              O arquivo baixado possui <strong>duas áreas reservadas de 4 cm</strong> livres para o
+              carimbo oficial do Contratante e Contratado. Entre no{' '}
+              <strong>Assinador GOV.BR</strong> com sua conta <strong>prata ou ouro</strong>, faça o
+              upload do PDF, posicione a assinatura e baixe o arquivo assinado.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1 text-[11px]">
+              <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                Autenticidade conferida no VALIDAR (validar.iti.gov.br)
+              </span>
+              <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                Validade jurídica Lei 14.063/2020
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Footer actions */}
         <div className="p-3 sm:p-4 border-t border-border/70 bg-card shrink-0 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => exportQuoteToPdf(quote, client, user, 'view')}
+              onClick={() => downloadQuoteBinaryPdf(quote, client, user)}
               className="h-9 px-3 text-xs gap-1.5"
-            >
-              <Eye className="w-3.5 h-3.5" /> Visualizar PDF
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => exportQuoteToPdf(quote, client, user, 'download')}
-              className="h-9 px-3 text-xs gap-1.5"
+              title="Baixa diretamente o arquivo .pdf"
             >
               <FileDown className="w-3.5 h-3.5" /> Baixar PDF
             </Button>
@@ -286,10 +309,31 @@ export function QuotePreviewDialog({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => shareQuotePdf(quote, client, user)}
-              className="h-9 px-3 text-xs gap-1.5"
+              onClick={() => downloadQuoteForGovBr(quote, client, user)}
+              className="h-9 px-3 text-xs gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+              title="Baixa o PDF e exibe instruções para o assinador"
             >
-              <Share2 className="w-3.5 h-3.5" /> Compartilhar
+              <ShieldCheck className="w-3.5 h-3.5" /> Baixar para assinar no GOV.BR
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={openGovBrSigner}
+              className="h-9 px-3 text-xs gap-1.5 text-blue-600 hover:text-blue-700"
+              title="Abre o site oficial assinador.iti.br"
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> Abrir Assinador GOV.BR
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => shareQuotePdfFile(quote, client, user)}
+              className="h-9 px-3 text-xs gap-1.5"
+              title="Compartilha o arquivo .pdf nativamente no celular"
+            >
+              <Share2 className="w-3.5 h-3.5" /> Compartilhar PDF
             </Button>
           </div>
 

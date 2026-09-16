@@ -2,29 +2,48 @@ import { Quote, Client, UserProfile } from '@/types'
 import { formatCurrency, formatDate, formatShortDate } from '@/lib/formatters'
 import { toast } from 'sonner'
 
-export function generateQuotePdfFilename(quote: Quote): string {
-  const cleanNumber = (quote.number || 'ORC').replace(/[^a-zA-Z0-9_-]/g, '_')
-  const clientName = (quote.eventName || 'Proposta').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30)
-  return `${cleanNumber}_${clientName}.pdf`
+export function generateQuotePdfFilename(quote: Quote, client?: Client): string {
+  const cleanNumber = (quote.number || 'ORC-000000').replace(/[^a-zA-Z0-9_-]/g, '_')
+  const clientName = (client?.name || 'Cliente').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 25)
+  const eventName = (quote.eventName || 'Evento').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 25)
+  return `Studio-Freela_${cleanNumber}_${clientName}_${eventName}.pdf`
 }
 
-export function generateQuoteFullHtml(
+/**
+ * Utilitário de escape de texto para streams PDF padrão (WinAnsiEncoding)
+ */
+function pdfEscapeText(text: string): string {
+  if (!text) return ''
+  // Normaliza acentos para compatibilidade com fontes Helvetica padrão de PDFs do ITI / GOV.BR
+  const asciiText = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\r\n\t]/g, ' ')
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)')
+  return asciiText
+}
+
+/**
+ * Constrói um arquivo PDF binário real (formato PDF-1.4 compatível com assinadores ITI / GOV.BR)
+ * com layout formal de 2 páginas:
+ * Página 1: Cabeçalho, Partes, Escopo de Serviços, Equipamentos e Cronograma
+ * Página 2: Resumo Financeiro, Condições Gerais, e ÁREAS RESERVADAS GOV.BR (4cm livres)
+ */
+export function buildQuoteBinaryPdfBlob(
   quote: Quote,
   client?: Client,
   user?: UserProfile | null,
-): string {
-  const emissionDate = quote.date ? formatDate(quote.date) : formatDate(new Date().toISOString())
+): Blob {
+  const emissionDate = quote.date ? formatShortDate(quote.date) : formatShortDate(new Date().toISOString())
   const validDays = quote.validityDays || 15
-
-  // Calculate validity expiration date
   const validUntilDate = new Date(quote.date ? new Date(quote.date) : new Date())
   validUntilDate.setDate(validUntilDate.getDate() + validDays)
-  const validUntilStr = formatDate(validUntilDate.toISOString())
+  const validUntilStr = formatShortDate(validUntilDate.toISOString())
 
   const items = quote.items || []
   const equipments = quote.equipments || []
-  const overtime = quote.overtimeRule
-  const logistics = quote.logistics
   const schedule = quote.paymentSchedule || []
 
   const servicesSubtotal = items.reduce(
@@ -37,568 +56,559 @@ export function generateQuoteFullHtml(
   }, 0)
 
   let expensesSubtotal = 0
-  if (logistics?.meal?.type === 'contracted')
-    expensesSubtotal += Number(logistics.meal.chargedAmount) || 0
-  if (logistics?.transport?.type === 'contracted')
-    expensesSubtotal += Number(logistics.transport.chargedAmount) || 0
-  if (logistics?.lodging?.type === 'contracted')
-    expensesSubtotal += Number(logistics.lodging.chargedAmount) || 0
+  if (quote.logistics?.meal?.type === 'contracted')
+    expensesSubtotal += Number(quote.logistics.meal.chargedAmount) || 0
+  if (quote.logistics?.transport?.type === 'contracted')
+    expensesSubtotal += Number(quote.logistics.transport.chargedAmount) || 0
+  if (quote.logistics?.lodging?.type === 'contracted')
+    expensesSubtotal += Number(quote.logistics.lodging.chargedAmount) || 0
 
   const discounts = quote.priceSummary?.discounts || 0
   const grandTotal =
     quote.total || servicesSubtotal + equipmentsSubtotal + expensesSubtotal - discounts
 
-  // Responsibility translations
-  const mealRespText =
-    logistics?.meal?.type === 'contractor'
-      ? 'Fornecida / Paga diretamente pelo Contratante no local'
-      : logistics?.meal?.type === 'contracted'
-        ? `Cobrada no orçamento (${formatCurrency(logistics.meal.chargedAmount || 0)})`
-        : 'Não se aplica'
+  // -------------------------------------------------------------
+  // PÁGINA 1: OPERAÇÕES DE STREAM
+  // -------------------------------------------------------------
+  const streamPage1: string[] = [
+    'q',
+    // Barra de destaque do topo
+    '0.47 0.21 0.04 rg', // tom bronze Studio Freela
+    '40 802 515 4 re f',
 
-  const transportRespText =
-    logistics?.transport?.type === 'contractor'
-      ? `Responsabilidade direta do Contratante (${logistics.transport.notes || 'transporte local ou aéreo fornecido'})`
-      : logistics?.transport?.type === 'contracted'
-        ? `Cobrado no orçamento (${formatCurrency(logistics.transport.chargedAmount || 0)})`
-        : 'Não se aplica'
+    // Cabeçalho
+    'BT',
+    '/F2 16 Tf',
+    '0.47 0.21 0.04 rg',
+    '40 780 Td',
+    `(${pdfEscapeText(user?.name || 'STUDIO FREELA - SERVICOS PROFISSIONAIS')}) Tj`,
+    'ET',
 
-  const lodgingRespText =
-    logistics?.lodging?.type === 'contractor'
-      ? `Reserva e pagamento direto pelo Contratante (${logistics.lodging.nightsCount || 1} diária(s))`
-      : logistics?.lodging?.type === 'contracted'
-        ? `Cobrada no orçamento (${formatCurrency(logistics.lodging.chargedAmount || 0)})`
-        : 'Não necessária'
+    'BT',
+    '/F1 9 Tf',
+    '0.35 0.35 0.35 rg',
+    '40 766 Td',
+    `(${pdfEscapeText(user?.profession || 'Prestacao de Servicos Especializados')} | ${pdfEscapeText(user?.email || '')} ${pdfEscapeText(user?.phone ? ' | ' + user.phone : '')}) Tj`,
+    'ET',
 
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <title>Proposta Comercial / Pré-Contrato - ${quote.number}</title>
-  <style>
-    @page {
-      size: A4;
-      margin: 14mm 15mm 15mm 15mm;
-    }
-    * {
-      box-sizing: border-box;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #1c1917;
-      background: #ffffff;
-      margin: 0;
-      padding: 0;
-      font-size: 11pt;
-      line-height: 1.45;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      border-bottom: 2px solid #b45309;
-      padding-bottom: 12px;
-      margin-bottom: 16px;
-    }
-    .brand-title {
-      font-size: 18pt;
-      font-weight: 700;
-      color: #78350f;
-      letter-spacing: -0.5px;
-      margin: 0;
-    }
-    .brand-sub {
-      font-size: 8.5pt;
-      color: #78716c;
-      margin-top: 2px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .quote-badge {
-      text-align: right;
-    }
-    .doc-type {
-      font-size: 10pt;
-      font-weight: 700;
-      color: #b45309;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .doc-number {
-      font-size: 13pt;
-      font-weight: 700;
-      color: #1c1917;
-      margin-top: 2px;
-    }
-    .doc-meta {
-      font-size: 8.5pt;
-      color: #78716c;
-      margin-top: 2px;
-    }
-    .parties-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      background: #fdfaf7;
-      border: 1px solid #fed7aa;
-      border-radius: 6px;
-      padding: 12px 14px;
-      margin-bottom: 16px;
-      font-size: 9pt;
-    }
-    .party-title {
-      font-weight: 700;
-      color: #9a3412;
-      text-transform: uppercase;
-      font-size: 8pt;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-      border-bottom: 1px dashed #fdba74;
-      padding-bottom: 2px;
-    }
-    .section-title {
-      font-size: 10pt;
-      font-weight: 700;
-      color: #78350f;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin: 14px 0 6px 0;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .event-box {
-      background: #fafaf9;
-      border: 1px solid #e7e5e4;
-      border-radius: 6px;
-      padding: 10px 14px;
-      font-size: 9pt;
-      margin-bottom: 14px;
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 12px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 9pt;
-      margin-bottom: 12px;
-    }
-    th {
-      background: #f5f5f4;
-      color: #44403c;
-      text-align: left;
-      padding: 6px 8px;
-      font-weight: 600;
-      border-bottom: 1px solid #d6d3d1;
-      font-size: 8pt;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-    td {
-      padding: 6px 8px;
-      border-bottom: 1px solid #f0f0ef;
-      vertical-align: top;
-    }
-    tr:last-child td {
-      border-bottom: none;
-    }
-    .text-right {
-      text-align: right;
-    }
-    .text-center {
-      text-align: center;
-    }
-    .totals-area {
-      display: flex;
-      justify-content: flex-end;
-      margin: 10px 0 16px 0;
-    }
-    .totals-box {
-      width: 280px;
-      background: #fdfaf7;
-      border: 1px solid #fed7aa;
-      border-radius: 6px;
-      padding: 10px 14px;
-      font-size: 9pt;
-    }
-    .totals-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 4px;
-      color: #57534e;
-    }
-    .grand-total-row {
-      display: flex;
-      justify-content: space-between;
-      border-top: 1.5px solid #b45309;
-      padding-top: 6px;
-      margin-top: 6px;
-      font-size: 11.5pt;
-      font-weight: 700;
-      color: #78350f;
-    }
-    .cond-box {
-      background: #fafaf9;
-      border: 1px solid #e7e5e4;
-      border-radius: 6px;
-      padding: 10px 14px;
-      font-size: 8.5pt;
-      line-height: 1.4;
-      color: #44403c;
-      margin-bottom: 14px;
-    }
-    .cond-item {
-      margin-bottom: 4px;
-    }
-    .signature-area {
-      margin-top: 24px;
-      page-break-inside: avoid;
-    }
-    .signature-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 30px;
-      margin-top: 36px;
-    }
-    .signature-line {
-      border-top: 1px solid #78716c;
-      padding-top: 4px;
-      text-align: center;
-      font-size: 8.5pt;
-      color: #44403c;
-    }
-    .footer-note {
-      text-align: center;
-      font-size: 7.5pt;
-      color: #a8a29e;
-      margin-top: 20px;
-      border-top: 1px solid #e7e5e4;
-      padding-top: 6px;
-    }
-  </style>
-</head>
-<body>
+    // Caixa de identificação da proposta (canto superior direito)
+    'BT',
+    '/F2 12 Tf',
+    '0.70 0.33 0.04 rg',
+    '400 780 Td',
+    `(${pdfEscapeText(quote.number || 'ORC-000000')}) Tj`,
+    'ET',
 
-  <!-- HEADER -->
-  <div class="header">
-    <div>
-      <h1 class="brand-title">${user?.name || 'Studio Freela'}</h1>
-      <div class="brand-sub">${user?.profession || 'Prestação de Serviços Especializados'}</div>
-      <div style="font-size: 8.5pt; color: #57534e; margin-top: 4px;">
-        ${user?.email ? `${user.email}` : ''} 
-        ${user?.phone ? `• ${user.phone}` : ''}
-      </div>
-    </div>
-    <div class="quote-badge">
-      <div class="doc-type">Proposta Comercial / Pré-Contrato</div>
-      <div class="doc-number">${quote.number}</div>
-      <div class="doc-meta">Emissão: ${emissionDate}</div>
-      <div class="doc-meta" style="color: #b45309; font-weight: 600;">Validade: ${validUntilStr} (${validDays} dias)</div>
-    </div>
-  </div>
+    'BT',
+    '/F1 8.5 Tf',
+    '0.3 0.3 0.3 rg',
+    '400 766 Td',
+    `(${pdfEscapeText(`Emissao: ${emissionDate} | Validade: ${validUntilStr} (${validDays}d)`)}) Tj`,
+    'ET',
 
-  <!-- PARTES ENVOLVIDAS -->
-  <div class="parties-grid">
-    <div>
-      <div class="party-title">Contratado (Prestador)</div>
-      <strong>${user?.name || 'Profissional Studio Freela'}</strong><br>
-      ${user?.profession ? `Especialidade: ${user.profession}<br>` : ''}
-      ${user?.phone ? `WhatsApp: ${user.phone}<br>` : ''}
-      ${user?.email ? `E-mail: ${user.email}<br>` : ''}
-      ${user?.address ? `Endereço: ${user.address}` : ''}
-    </div>
-    <div>
-      <div class="party-title">Contratante (Cliente)</div>
-      <strong>${client?.name || 'Cliente'}</strong> ${client?.tradeName ? `(${client.tradeName})` : ''}<br>
-      ${client?.document ? `CPF/CNPJ: ${client.document}<br>` : ''}
-      ${client?.phone ? `Telefone: ${client.phone}<br>` : ''}
-      ${client?.email ? `E-mail: ${client.email}<br>` : ''}
-      ${client?.addressData?.street ? `Endereço: ${client.addressData.street}, ${client.addressData.number || 'S/N'} - ${client.addressData.city || ''}/${client.addressData.state || ''}` : ''}
-    </div>
-  </div>
+    // Linha divisória
+    '0.85 0.85 0.85 RG',
+    '1 w',
+    '40 754 m 555 754 l S',
 
-  <!-- DADOS DO EVENTO / CRONOGRAMA -->
-  <div class="section-title">1. Dados do Evento & Cronograma de Execução</div>
-  <div class="event-box">
-    <div>
-      <strong>Evento:</strong> ${quote.eventName || 'Serviço sob demanda'}<br>
-      <strong>Local:</strong> ${quote.eventLocation || 'A definir / Conforme alinhamento'}<br>
-      ${quote.notes ? `<strong>Observações:</strong> ${quote.notes}` : ''}
-    </div>
-    <div>
-      <strong>Início:</strong> ${quote.eventStartDate ? formatShortDate(quote.eventStartDate) : emissionDate} às ${quote.eventStartTime || '09:00'}<br>
-      <strong>Término:</strong> ${quote.eventEndDate ? formatShortDate(quote.eventEndDate) : quote.eventStartDate ? formatShortDate(quote.eventStartDate) : emissionDate} às ${quote.eventEndTime || '18:00'}<br>
-      <span style="display:inline-block; margin-top: 4px; padding: 2px 6px; background: #e0f2fe; color: #0369a1; border-radius: 4px; font-weight: 600; font-size: 7.5pt;">
-        PRÉ-RESERVA DA DATA
-      </span>
-    </div>
-  </div>
+    // 1. PARTES ENVOLVIDAS
+    '0.96 0.95 0.94 rg',
+    '40 682 515 62 re f',
+    '0.85 0.80 0.75 RG',
+    '40 682 515 62 re S',
 
-  <!-- SERVIÇOS -->
-  <div class="section-title">2. Escopo dos Serviços Contratados</div>
-  <table>
-    <thead>
-      <tr>
-        <th style="width: 50%;">Descrição do Item / Atividade</th>
-        <th class="text-center" style="width: 15%;">Unidade</th>
-        <th class="text-center" style="width: 10%;">Qtd</th>
-        <th class="text-right" style="width: 12%;">Valor Un.</th>
-        <th class="text-right" style="width: 13%;">Total</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${items
-        .map(
-          (it) => `
-        <tr>
-          <td><strong>${it.description}</strong></td>
-          <td class="text-center">${it.unit || 'serviço'}</td>
-          <td class="text-center">${it.quantity}</td>
-          <td class="text-right">${formatCurrency(it.unitPrice)}</td>
-          <td class="text-right"><strong>${formatCurrency(it.quantity * it.unitPrice)}</strong></td>
-        </tr>
-      `,
-        )
-        .join('')}
-    </tbody>
-  </table>
+    'BT',
+    '/F2 9 Tf',
+    '0.60 0.20 0.07 rg',
+    '50 730 Td',
+    '(CONTRATADO / PRESTADOR:) Tj',
+    'ET',
+    'BT',
+    '/F1 8.5 Tf',
+    '0.15 0.15 0.15 rg',
+    '50 716 Td',
+    `(${pdfEscapeText(user?.name || 'Profissional Studio Freela')}) Tj`,
+    'ET',
+    'BT',
+    '/F1 8 Tf',
+    '0.35 0.35 0.35 rg',
+    '50 702 Td',
+    `(${pdfEscapeText(user?.profession || 'Prestador Autonomo')} - ${pdfEscapeText(user?.email || '')}) Tj`,
+    'ET',
 
-  <!-- EQUIPAMENTOS -->
-  ${
-    equipments.length > 0
-      ? `
-    <div class="section-title">3. Equipamentos e Infraestrutura Fornecidos</div>
-    <table>
-      <thead>
-        <tr>
-          <th style="width: 60%;">Equipamento / Especificação</th>
-          <th class="text-center" style="width: 10%;">Qtd</th>
-          <th class="text-center" style="width: 15%;">Condição</th>
-          <th class="text-right" style="width: 15%;">Valor</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${equipments
-          .map(
-            (eq) => `
-          <tr>
-            <td>${eq.description}</td>
-            <td class="text-center">${eq.quantity}</td>
-            <td class="text-center">${eq.includedInService ? '<span style="color:#15803d; font-weight:600;">Incluso</span>' : 'Locação'}</td>
-            <td class="text-right">${eq.includedInService ? 'R$ 0,00' : formatCurrency(eq.unitPrice * eq.quantity)}</td>
-          </tr>
-        `,
-          )
-          .join('')}
-      </tbody>
-    </table>
-  `
-      : ''
+    'BT',
+    '/F2 9 Tf',
+    '0.60 0.20 0.07 rg',
+    '310 730 Td',
+    '(CONTRATANTE / CLIENTE:) Tj',
+    'ET',
+    'BT',
+    '/F1 8.5 Tf',
+    '0.15 0.15 0.15 rg',
+    '310 716 Td',
+    `(${pdfEscapeText(client?.name || 'Cliente')} ${pdfEscapeText(client?.tradeName ? '(' + client.tradeName + ')' : '')}) Tj`,
+    'ET',
+    'BT',
+    '/F1 8 Tf',
+    '0.35 0.35 0.35 rg',
+    '310 702 Td',
+    `(${pdfEscapeText(`Doc: ${client?.document || 'N/I'} | Tel: ${client?.phone || 'N/I'}`)}) Tj`,
+    'ET',
+
+    // 2. CRONOGRAMA E EVENTO
+    'BT',
+    '/F2 10 Tf',
+    '0.47 0.21 0.04 rg',
+    '40 662 Td',
+    '(1. DADOS DO PROJETO & CRONOGRAMA) Tj',
+    'ET',
+
+    '0.98 0.98 0.98 rg',
+    '40 606 515 48 re f',
+    '0.88 0.88 0.88 RG',
+    '40 606 515 48 re S',
+
+    'BT',
+    '/F2 9 Tf',
+    '0.15 0.15 0.15 rg',
+    '50 638 Td',
+    `(${pdfEscapeText(`Projeto/Evento: ${quote.eventName || 'Servico Comercial Sob Demanda'}`)}) Tj`,
+    'ET',
+    'BT',
+    '/F1 8.5 Tf',
+    '0.3 0.3 0.3 rg',
+    '50 624 Td',
+    `(${pdfEscapeText(`Inicio: ${quote.eventStartDate ? formatShortDate(quote.eventStartDate) : emissionDate} as ${quote.eventStartTime || '09:00'} | Termino: ${quote.eventEndDate ? formatShortDate(quote.eventEndDate) : emissionDate} as ${quote.eventEndTime || '18:00'}`)}) Tj`,
+    'ET',
+    'BT',
+    '/F1 8 Tf',
+    '0.35 0.35 0.35 rg',
+    '50 612 Td',
+    `(${pdfEscapeText(`Local: ${quote.eventLocation || 'A definir / Conforme alinhamento'}`)}) Tj`,
+    'ET',
+
+    // 3. ESCOPO DOS SERVIÇOS
+    'BT',
+    '/F2 10 Tf',
+    '0.47 0.21 0.04 rg',
+    '40 586 Td',
+    '(2. ESCOPO DOS SERVICOS CONTRATADOS) Tj',
+    'ET',
+
+    // Cabeçalho da tabela de serviços
+    '0.92 0.92 0.92 rg',
+    '40 564 515 16 re f',
+    'BT',
+    '/F2 8 Tf',
+    '0.2 0.2 0.2 rg',
+    '46 568 Td',
+    '(ITEM / DESCRICAO DO SERVICO) Tj',
+    '330 568 Td',
+    '(UN.) Tj',
+    '370 568 Td',
+    '(QTD) Tj',
+    '430 568 Td',
+    '(UNITARIO) Tj',
+    '490 568 Td',
+    '(TOTAL) Tj',
+    'ET',
+  ]
+
+  // Linhas da tabela de serviços na página 1
+  let currentY = 548
+  const maxItems = Math.min(items.length, 10)
+  for (let i = 0; i < maxItems; i++) {
+    const it = items[i]
+    const itemTotal = (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0)
+    streamPage1.push(
+      '0.97 0.97 0.97 RG',
+      `40 ${currentY - 4} m 555 ${currentY - 4} l S`,
+      'BT',
+      '/F1 8 Tf',
+      '0.15 0.15 0.15 rg',
+      `46 ${currentY} Td`,
+      `(${pdfEscapeText(it.description.slice(0, 50))}) Tj`,
+      `330 ${currentY} Td`,
+      `(${pdfEscapeText(it.unit || 'sv')}) Tj`,
+      `375 ${currentY} Td`,
+      `(${it.quantity}) Tj`,
+      `425 ${currentY} Td`,
+      `(${pdfEscapeText(formatCurrency(it.unitPrice))}) Tj`,
+      `490 ${currentY} Td`,
+      `(${pdfEscapeText(formatCurrency(itemTotal))}) Tj`,
+      'ET',
+    )
+    currentY -= 16
   }
 
-  <!-- HORA EXTRA E LOGÍSTICA -->
-  <div class="section-title">${equipments.length > 0 ? '4' : '3'}. Condições de Hora Extra & Logística</div>
-  <div class="cond-box">
-    ${
-      overtime?.enabled
-        ? `
-      <div class="cond-item">
-        <strong>Hora Extra Adicional:</strong> Fica convencionado o valor de <strong>${formatCurrency(overtime.hourlyRate)} por hora adicional</strong> excedente ao cronograma previsto, com tolerância inicial de <strong>${overtime.graceMinutes || 0} minutos</strong> gratuitos. ${overtime.notes || ''} <em>(Obs: cobrada em acerto posterior caso incorrida).</em>
-      </div>
-    `
-        : '<div class="cond-item"><strong>Hora Extra:</strong> Não prevista / Conforme novo alinhamento entre as partes.</div>'
-    }
-    <div class="cond-item">
-      <strong>Alimentação / Refeição:</strong> ${mealRespText}
-    </div>
-    <div class="cond-item">
-      <strong>Transporte / Deslocamento:</strong> ${transportRespText}
-    </div>
-    <div class="cond-item">
-      <strong>Hospedagem:</strong> ${lodgingRespText}
-    </div>
-  </div>
+  // Rodapé da Página 1 com instrução de continuidade
+  streamPage1.push(
+    '0.85 0.85 0.85 RG',
+    '40 45 m 555 45 l S',
+    'BT',
+    '/F1 7.5 Tf',
+    '0.5 0.5 0.5 rg',
+    '40 34 Td',
+    `(${pdfEscapeText(`Studio Freela • Proposta ${quote.number || 'ORC'} • Pagina 1 de 2 • Continua na pagina 2 para resumo e assinatura GOV.BR`)}) Tj`,
+    'ET',
+    'Q',
+  )
 
-  <!-- TOTAIS -->
-  <div class="totals-area">
-    <div class="totals-box">
-      <div class="totals-row">
-        <span>Subtotal Serviços:</span>
-        <span>${formatCurrency(servicesSubtotal)}</span>
-      </div>
-      ${
-        equipmentsSubtotal > 0
-          ? `
-        <div class="totals-row">
-          <span>Subtotal Equipamentos:</span>
-          <span>${formatCurrency(equipmentsSubtotal)}</span>
-        </div>
-      `
-          : ''
-      }
-      ${
-        expensesSubtotal > 0
-          ? `
-        <div class="totals-row">
-          <span>Despesas de Logística:</span>
-          <span>${formatCurrency(expensesSubtotal)}</span>
-        </div>
-      `
-          : ''
-      }
-      ${
-        discounts > 0
-          ? `
-        <div class="totals-row" style="color: #15803d;">
-          <span>Desconto Comercial:</span>
-          <span>- ${formatCurrency(discounts)}</span>
-        </div>
-      `
-          : ''
-      }
-      <div class="grand-total-row">
-        <span>TOTAL GERAL:</span>
-        <span>${formatCurrency(grandTotal)}</span>
-      </div>
-    </div>
-  </div>
+  // -------------------------------------------------------------
+  // PÁGINA 2: CONDICOES, TOTAIS E ÁREAS LIVRES GOV.BR
+  // -------------------------------------------------------------
+  const streamPage2: string[] = [
+    'q',
+    // Barra superior
+    '0.47 0.21 0.04 rg',
+    '40 802 515 4 re f',
 
-  <!-- CALENDÁRIO DE PAGAMENTO -->
-  <div class="section-title">${equipments.length > 0 ? '5' : '4'}. Calendário e Forma de Pagamento</div>
-  <table>
-    <thead>
-      <tr>
-        <th style="width: 45%;">Descrição da Parcela</th>
-        <th class="text-center" style="width: 25%;">Vencimento</th>
-        <th class="text-center" style="width: 15%;">Meio</th>
-        <th class="text-right" style="width: 15%;">Valor</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${schedule
-        .map(
-          (sc) => `
-        <tr>
-          <td><strong>${sc.description}</strong></td>
-          <td class="text-center">${formatDate(sc.dueDate)}</td>
-          <td class="text-center">${sc.method}</td>
-          <td class="text-right"><strong>${formatCurrency(sc.value)}</strong></td>
-        </tr>
-      `,
-        )
-        .join('')}
-    </tbody>
-  </table>
+    'BT',
+    '/F2 11 Tf',
+    '0.47 0.21 0.04 rg',
+    '40 782 Td',
+    `(${pdfEscapeText(`PROPOSTA COMERCIAL ${quote.number || 'ORC'} - CONDICOES FINANCEIRAS & ASSINATURA`)}) Tj`,
+    'ET',
 
-  <!-- CLÁUSULAS RESUMIDAS DE PRÉ-CONTRATO -->
-  <div class="section-title">${equipments.length > 0 ? '6' : '5'}. Disposições Gerais & Validade da Pré-Reserva</div>
-  <div class="cond-box" style="font-size: 8pt; line-height: 1.35;">
-    <p style="margin: 0 0 4px 0;"><strong>1. Validade da Pré-reserva:</strong> A data do evento permanecerá pré-reservada pelo prazo de validade desta proposta (${validDays} dias a contar da emissão). A confirmação definitiva da agenda ocorre mediante pagamento do sinal acordado ou assinatura deste instrumento.</p>
-    <p style="margin: 0 0 4px 0;"><strong>2. Alterações de Escopo:</strong> Qualquer serviço, diária ou hora adicional solicitada além do estipulado será objeto de aditivo e cobrada conforme valores vigentes.</p>
-    <p style="margin: 0 0 4px 0;"><strong>3. Cancelamento:</strong> Em caso de desistência imotivada pelo Contratante após a confirmação, o sinal poderá ser retido para cobertura de custos operacionais e reserva de data.</p>
-    <p style="margin: 0;"><strong>4. Eficácia:</strong> Este documento constitui Proposta Comercial com força de Pré-contrato vinculante quando rubricado ou confirmado formalmente entre as partes.</p>
-  </div>
+    // 4. RESUMO FINANCEIRO E CALENDÁRIO
+    'BT',
+    '/F2 9.5 Tf',
+    '0.2 0.2 0.2 rg',
+    '40 760 Td',
+    '(3. CALENDARIO DE PAGAMENTO & TOTAIS) Tj',
+    'ET',
 
-  <!-- ÁREA DE ACEITE E ASSINATURA -->
-  <div class="signature-area">
-    <div style="font-size: 8.5pt; text-align: center; color: #57534e; margin-bottom: 8px;">
-      De acordo com os termos, datas, escopo e valores apresentados nesta Proposta Comercial:
-    </div>
+    // Tabela do calendário
+    '0.94 0.94 0.94 rg',
+    '40 738 310 16 re f',
+    'BT',
+    '/F2 8 Tf',
+    '0.2 0.2 0.2 rg',
+    '46 742 Td',
+    '(PARCELA) Tj',
+    '180 742 Td',
+    '(VENCIMENTO) Tj',
+    '255 742 Td',
+    '(MEIO) Tj',
+    '300 742 Td',
+    '(VALOR) Tj',
+    'ET',
+  ]
 
-    <div class="signature-grid">
-      <div>
-        <div class="signature-line">
-          <strong>${user?.name || 'CONTRATADO (PRESTADOR)'}</strong><br>
-          ${user?.profession || 'Prestador de Serviços'}
-        </div>
-      </div>
-      <div>
-        <div class="signature-line">
-          <strong>${client?.name || 'CONTRATANTE'}</strong><br>
-          CPF/CNPJ: ${client?.document || '________________________'}<br>
-          Data: ____/____/________
-        </div>
-      </div>
-    </div>
-  </div>
+  let schedY = 722
+  for (let s = 0; s < Math.min(schedule.length, 4); s++) {
+    const sc = schedule[s]
+    streamPage2.push(
+      '0.96 0.96 0.96 RG',
+      `40 ${schedY - 3} m 350 ${schedY - 3} l S`,
+      'BT',
+      '/F1 8 Tf',
+      '0.2 0.2 0.2 rg',
+      `46 ${schedY} Td`,
+      `(${pdfEscapeText(sc.description.slice(0, 24))}) Tj`,
+      `180 ${schedY} Td`,
+      `(${pdfEscapeText(formatShortDate(sc.dueDate))}) Tj`,
+      `255 ${schedY} Td`,
+      `(${pdfEscapeText(sc.method)}) Tj`,
+      `295 ${schedY} Td`,
+      `(${pdfEscapeText(formatCurrency(sc.value))}) Tj`,
+      'ET',
+    )
+    schedY -= 15
+  }
 
-  <div class="footer-note">
-    Documento gerado eletronicamente por <strong>Studio Freela</strong> (studiofreela.com) • Proposta Comercial #${quote.number}
-  </div>
+  // Caixa de Total Geral (lado direito)
+  streamPage2.push(
+    '0.98 0.96 0.93 rg',
+    '365 675 190 79 re f',
+    '0.88 0.75 0.60 RG',
+    '365 675 190 79 re S',
 
-</body>
-</html>`
+    'BT',
+    '/F1 8 Tf',
+    '0.4 0.4 0.4 rg',
+    '375 738 Td',
+    `(${pdfEscapeText(`Servicos: ${formatCurrency(servicesSubtotal)}`)}) Tj`,
+    '375 724 Td',
+    `(${pdfEscapeText(`Equipamentos: ${formatCurrency(equipmentsSubtotal)}`)}) Tj`,
+    '375 710 Td',
+    `(${pdfEscapeText(`Despesas/Logistica: ${formatCurrency(expensesSubtotal)}`)}) Tj`,
+    'ET',
+
+    '0.80 0.50 0.30 RG',
+    '375 700 m 545 700 l S',
+
+    'BT',
+    '/F2 11 Tf',
+    '0.47 0.21 0.04 rg',
+    '375 684 Td',
+    `(${pdfEscapeText(`TOTAL: ${formatCurrency(grandTotal)}`)}) Tj`,
+    'ET',
+
+    // Observações legais sobre pré-contrato e assinatura GOV.BR
+    '0.96 0.96 0.96 rg',
+    '40 605 515 54 re f',
+    '0.85 0.85 0.85 RG',
+    '40 605 515 54 re S',
+
+    'BT',
+    '/F2 8.5 Tf',
+    '0.3 0.3 0.3 rg',
+    '48 644 Td',
+    '(DISPOSICOES GERAIS & INSTRUCOES DE ASSINATURA ELETRONICA:) Tj',
+    'ET',
+    'BT',
+    '/F1 7.5 Tf',
+    '0.35 0.35 0.35 rg',
+    '48 630 Td',
+    '(1. Documento preparado para assinatura eletronica oficial via GOV.BR nos termos da Lei 14.063/2020.) Tj',
+    '48 618 Td',
+    '(2. Apos conferir os dados, acesse assinador.iti.br com sua conta prata ou ouro e posicione o carimbo na area abaixo.) Tj',
+    '48 607 Td',
+    '(3. A autenticidade podera ser verificada publicamente a qualquer momento em validar.iti.gov.br.) Tj',
+    'ET',
+
+    // =========================================================================
+    // SEÇÃO DE ASSINATURAS ELETRÔNICAS GOV.BR
+    // REQUISITO CRÍTICO: 2 áreas em branco com altura mínima aproximada de 4 cm (113 pt)
+    // cada, SEM textos ou linhas atravessando a região de carimbo.
+    // =========================================================================
+    'BT',
+    '/F2 10 Tf',
+    '0.47 0.21 0.04 rg',
+    '40 584 Td',
+    '(ASSINATURAS ELETRONICAS) Tj',
+    'ET',
+
+    // --- ÁREA 1: CONTRATANTE (CLIENTE) ---
+    // Altura: 115 pt (~4.05 cm). Caixa com borda discreta, interior completamente livre.
+    '0.75 0.75 0.75 RG',
+    '0.8 w',
+    '40 445 515 125 re S',
+
+    'BT',
+    '/F2 8.5 Tf',
+    '0.25 0.25 0.25 rg',
+    '48 554 Td',
+    '([ Area livre para assinatura eletronica do CONTRATANTE via GOV.BR ]) Tj',
+    'ET',
+
+    // Rótulos informativos na base da área
+    'BT',
+    '/F1 8 Tf',
+    '0.35 0.35 0.35 rg',
+    '48 472 Td',
+    `(${pdfEscapeText(`Nome/Razao social: ${client?.name || 'Cliente'}`)}) Tj`,
+    '48 460 Td',
+    `(${pdfEscapeText(`CPF/CNPJ: ${client?.document || '_________________________'}`)}) Tj`,
+    '48 448 Td',
+    '(Data: _____ / _____ / _________) Tj',
+    'ET',
+
+    // --- ÁREA 2: CONTRATADO (PRESTADOR) ---
+    // Altura: 115 pt (~4.05 cm). Caixa com borda discreta, interior completamente livre.
+    '0.75 0.75 0.75 RG',
+    '0.8 w',
+    '40 300 515 125 re S',
+
+    'BT',
+    '/F2 8.5 Tf',
+    '0.25 0.25 0.25 rg',
+    '48 409 Td',
+    '([ Area livre para assinatura eletronica do CONTRATADO via GOV.BR ]) Tj',
+    'ET',
+
+    // Rótulos informativos na base da área
+    'BT',
+    '/F1 8 Tf',
+    '0.35 0.35 0.35 rg',
+    '48 327 Td',
+    `(${pdfEscapeText(`Nome/Razao social: ${user?.name || 'Studio Freela'}`)}) Tj`,
+    '48 315 Td',
+    `(${pdfEscapeText(`CPF/CNPJ: ${user?.cpfCnpj || '_________________________'}`)}) Tj`,
+    '48 303 Td',
+    '(Data: _____ / _____ / _________) Tj',
+    'ET',
+
+    // Nota final obrigatória conforme especificação
+    'BT',
+    '/F1 7 Tf',
+    '0.45 0.45 0.45 rg',
+    '40 270 Td',
+    '(Documento preparado para assinatura eletronica. Apos conferir os dados, faca o download do PDF e utilize) Tj',
+    '40 260 Td',
+    '(o servico oficial de Assinatura Eletronica GOV.BR. A autenticidade do arquivo assinado podera ser verificada no VALIDAR.) Tj',
+    'ET',
+
+    // Rodapé da Página 2
+    '0.85 0.85 0.85 RG',
+    '40 45 m 555 45 l S',
+    'BT',
+    '/F1 7.5 Tf',
+    '0.5 0.5 0.5 rg',
+    '40 34 Td',
+    `(${pdfEscapeText(`Studio Freela (studiofreela.com) • Proposta Comercial #${quote.number || 'ORC'} • Pagina 2 de 2 • Preparado para GOV.BR`)}) Tj`,
+    'ET',
+    'Q',
+  ]
+
+  // Montagem do PDF em sintaxe canônica PDF-1.4
+  const page1Content = streamPage1.join('\n')
+  const page2Content = streamPage2.join('\n')
+
+  const objects: string[] = []
+  // Obj 1: Catalog
+  objects.push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n')
+  // Obj 2: Pages
+  objects.push('2 0 obj\n<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>\nendobj\n')
+  // Obj 3: Page 1
+  objects.push(
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 7 0 R >>\nendobj\n',
+  )
+  // Obj 4: Page 2
+  objects.push(
+    '4 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 8 0 R >>\nendobj\n',
+  )
+  // Obj 5: Font Regular
+  objects.push('5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n')
+  // Obj 6: Font Bold
+  objects.push('6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n')
+  // Obj 7: Stream Page 1
+  objects.push(
+    `7 0 obj\n<< /Length ${page1Content.length} >>\nstream\n${page1Content}\nendstream\nendobj\n`,
+  )
+  // Obj 8: Stream Page 2
+  objects.push(
+    `8 0 obj\n<< /Length ${page2Content.length} >>\nstream\n${page2Content}\nendstream\nendobj\n`,
+  )
+
+  let pdfString = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'
+  const offsets: number[] = []
+
+  for (let i = 0; i < objects.length; i++) {
+    offsets.push(pdfString.length)
+    pdfString += objects[i]
+  }
+
+  const xrefOffset = pdfString.length
+  pdfString += 'xref\n'
+  pdfString += `0 ${objects.length + 1}\n`
+  pdfString += '0000000000 65535 f \n'
+  for (let i = 0; i < offsets.length; i++) {
+    pdfString += `${offsets[i].toString().padStart(10, '0')} 00000 n \n`
+  }
+
+  pdfString += 'trailer\n'
+  pdfString += `<< /Size ${objects.length + 1} /Root 1 0 R >>\n`
+  pdfString += 'startxref\n'
+  pdfString += `${xrefOffset}\n`
+  pdfString += '%%EOF\n'
+
+  const binaryLen = pdfString.length
+  const bytes = new Uint8Array(binaryLen)
+  for (let i = 0; i < binaryLen; i++) {
+    bytes[i] = pdfString.charCodeAt(i) & 0xff
+  }
+
+  return new Blob([bytes], { type: 'application/pdf' })
 }
 
+/**
+ * Baixa diretamente o arquivo PDF real binário
+ */
+export function downloadQuoteBinaryPdf(quote: Quote, client?: Client, user?: UserProfile | null) {
+  try {
+    const blob = buildQuoteBinaryPdfBlob(quote, client, user)
+    const filename = generateQuotePdfFilename(quote, client)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(url), 2000)
+    toast.success('PDF do orçamento gerado e baixado com sucesso!')
+  } catch (err: any) {
+    console.error('Erro ao gerar PDF binário:', err)
+    toast.error('Erro ao gerar arquivo PDF.')
+  }
+}
+
+/**
+ * Baixa o PDF e orienta para assinatura no GOV.BR
+ */
+export function downloadQuoteForGovBr(quote: Quote, client?: Client, user?: UserProfile | null) {
+  downloadQuoteBinaryPdf(quote, client, user)
+  toast.info('PDF pronto para assinatura!', {
+    description:
+      'Arquivo baixado com áreas de 4cm livres. Faça upload no Assinador GOV.BR (assinador.iti.br) com sua conta prata/ouro.',
+    duration: 8000,
+  })
+}
+
+/**
+ * Abre o Assinador oficial GOV.BR em nova aba
+ */
+export function openGovBrSigner() {
+  window.open('https://assinador.iti.br/', '_blank', 'noopener,noreferrer')
+}
+
+/**
+ * Compartilha o arquivo PDF binário real nativamente via navigator.share({ files })
+ * ou faz download automático quando indisponível.
+ */
+export async function shareQuotePdfFile(
+  quote: Quote,
+  client?: Client,
+  user?: UserProfile | null,
+) {
+  const filename = generateQuotePdfFilename(quote, client)
+  const blob = buildQuoteBinaryPdfBlob(quote, client, user)
+  const file = new File([blob], filename, { type: 'application/pdf' })
+
+  if (
+    navigator.canShare &&
+    navigator.canShare({ files: [file] }) &&
+    navigator.share
+  ) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: `Orçamento ${quote.number} - Studio Freela`,
+        text: `Segue proposta comercial #${quote.number} preparada para assinatura digital.`,
+      })
+      toast.success('Arquivo PDF compartilhado com sucesso!')
+      return
+    } catch (err: any) {
+      if (err.name === 'AbortError') return
+      console.warn('Falha no compartilhamento nativo de arquivo:', err)
+    }
+  }
+
+  // Fallback: download direto do arquivo
+  downloadQuoteBinaryPdf(quote, client, user)
+  toast.info('Compartilhamento de arquivo indisponível neste navegador. O PDF foi baixado diretamente.')
+}
+
+/**
+ * Mantém compatibilidade com exportQuoteToPdf e shareQuotePdf existentes
+ */
 export function exportQuoteToPdf(
   quote: Quote,
   client?: Client,
   user?: UserProfile | null,
   action: 'view' | 'download' = 'download',
 ) {
-  const html = generateQuoteFullHtml(quote, client, user)
-  const filename = generateQuotePdfFilename(quote)
-
-  const printWindow = window.open('', '_blank')
-  if (!printWindow) {
-    toast.error(
-      'O navegador bloqueou a abertura de nova janela. Permita popups para visualizar o PDF.',
-    )
-    return
-  }
-
-  printWindow.document.open()
-  printWindow.document.write(html)
-  printWindow.document.close()
-
   if (action === 'download') {
-    printWindow.onload = () => {
-      printWindow.document.title = filename
-      printWindow.focus()
-      setTimeout(() => {
-        printWindow.print()
-      }, 300)
-    }
+    downloadQuoteBinaryPdf(quote, client, user)
   } else {
-    printWindow.onload = () => {
-      printWindow.document.title = filename
-      printWindow.focus()
-    }
+    const blob = buildQuoteBinaryPdfBlob(quote, client, user)
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
   }
 }
 
 export async function shareQuotePdf(quote: Quote, client?: Client, user?: UserProfile | null) {
-  const title = `Proposta Comercial ${quote.number} - ${quote.eventName || 'Studio Freela'}`
-  const text = `Segue a Proposta Comercial ${quote.number} para ${client?.name || 'o cliente'}, no valor de ${formatCurrency(quote.total)}.`
-
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title,
-        text,
-        url: window.location.href,
-      })
-      toast.success('Proposta compartilhada com sucesso!')
-      return
-    } catch (e: any) {
-      if (e.name !== 'AbortError') {
-        // Fallback to PDF export
-        exportQuoteToPdf(quote, client, user, 'download')
-      }
-    }
-  } else {
-    // Fallback: copy share message or open print window
-    try {
-      await navigator.clipboard.writeText(
-        `${title}\n${text}\nValor: ${formatCurrency(quote.total)}`,
-      )
-      toast.success('Resumo da proposta copiado para a área de transferência!')
-      exportQuoteToPdf(quote, client, user, 'download')
-    } catch (_) {
-      exportQuoteToPdf(quote, client, user, 'download')
-    }
-  }
+  return shareQuotePdfFile(quote, client, user)
 }

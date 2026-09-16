@@ -35,6 +35,7 @@ type AppDataContextType = {
   addQuote: (quote: Omit<Quote, 'id' | 'number'> & { number?: string }) => Promise<Quote | null>
   updateQuote: (id: string, quote: Partial<Omit<Quote, 'id'>>) => Promise<boolean>
   deleteQuote: (id: string) => Promise<boolean>
+  resyncQuote: (id: string) => Promise<boolean>
   addContract: (
     contract: Omit<Contract, 'id' | 'number'> & { number?: string },
   ) => Promise<Contract | null>
@@ -178,14 +179,19 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         const createdFinance = await appDataService.createFinance({
           clientId: createdEvent.clientId,
           eventId: createdEvent.id,
+          quoteId: createdEvent.quoteId,
           title: `Pagamento: ${createdEvent.title}`,
           value: createdEvent.value,
           dueDate: createdEvent.date,
           status: 'Pendente',
         })
         setFinances((prev) => [...prev, createdFinance])
-      } catch (fErr) {
-        console.warn('Erro ao auto-gerar título:', fErr)
+      } catch (fErr: any) {
+        console.error('Erro ao auto-gerar título financeiro:', fErr)
+        toast.warning('Evento agendado, mas a geração do título financeiro falhou.', {
+          description: fErr?.message || 'Verifique o Financeiro para lançar a parcela manualmente.',
+        })
+        return createdEvent
       }
 
       toast.success('Evento agendado e título financeiro gerado!')
@@ -294,13 +300,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     try {
       const created = await appDataService.createQuote(quoteData)
       setQuotes((prev) => [created, ...prev])
-      // Reload events and finances to capture the synced changes
-      loadData()
-      toast.success('Orçamento salvo com sucesso!')
+      // Recarrega dados para capturar o evento da agenda e as parcelas criadas
+      await loadData()
+      toast.success('Orçamento salvo e sincronizado com sucesso!', {
+        description:
+          created.status === 'Confirmado'
+            ? 'Evento confirmado na agenda (vermelho) e parcelas pendentes.'
+            : 'Pré-reserva criada na agenda (verde) e parcelas previstas no financeiro.',
+      })
       return created
     } catch (err: any) {
       const msg = err?.response?.message || err?.message || 'Erro ao criar orçamento.'
-      toast.error('Erro no orçamento', { description: msg })
+      console.error('[StudioFreela] Falha em addQuote:', err)
+      await loadData()
+      toast.error('Atenção na sincronização', {
+        description: msg,
+      })
       return null
     }
   }
@@ -312,13 +327,37 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     try {
       const updated = await appDataService.updateQuote(id, quoteData)
       setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
-      // Reload events and finances to capture the synced changes
-      loadData()
+      // Recarrega agenda e financeiro com as alterações sincronizadas
+      await loadData()
       toast.success('Orçamento atualizado com sucesso!')
       return true
     } catch (err: any) {
       const msg = err?.response?.message || err?.message || 'Erro ao atualizar orçamento.'
-      toast.error('Erro ao atualizar', { description: msg })
+      console.error('[StudioFreela] Falha em updateQuote:', err)
+      await loadData()
+      toast.error('Atenção na sincronização', {
+        description: msg,
+      })
+      return false
+    }
+  }
+
+  const resyncQuote = async (id: string): Promise<boolean> => {
+    try {
+      const updated = await appDataService.resyncQuote(id)
+      setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
+      await loadData()
+      toast.success('Sincronização concluída com sucesso!', {
+        description: 'Vínculos de agenda e financeiro reprocessados e atualizados.',
+      })
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.message || err?.message || 'Falha ao reprocessar sincronização.'
+      console.error('[StudioFreela] Falha em resyncQuote:', err)
+      await loadData()
+      toast.error('Falha na sincronização', {
+        description: msg,
+      })
       return false
     }
   }
@@ -406,6 +445,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         addQuote,
         updateQuote,
         deleteQuote,
+        resyncQuote,
         addContract,
         updateContract,
         deleteContract,
