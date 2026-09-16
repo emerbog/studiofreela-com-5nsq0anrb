@@ -24,6 +24,7 @@ import { Plus, Loader2 } from 'lucide-react'
 import { AppEvent, EventStatus } from '@/types'
 import { toast } from 'sonner'
 import { ClientSelector } from '@/components/ClientSelector'
+import { toLocalDateString } from '@/lib/formatters'
 
 interface EventFormDialogProps {
   triggerAsChild?: React.ReactNode
@@ -52,7 +53,7 @@ export function EventFormDialog({
   const [formData, setFormData] = useState({
     title: '',
     clientId: '',
-    date: defaultDate ? defaultDate.toISOString().split('T')[0] : '',
+    date: defaultDate ? toLocalDateString(defaultDate) : '',
     time: '',
     location: '',
     value: '',
@@ -63,7 +64,7 @@ export function EventFormDialog({
       setFormData({
         title: eventToEdit.title || '',
         clientId: eventToEdit.clientId || '',
-        date: eventToEdit.date ? eventToEdit.date.slice(0, 10) : '',
+        date: eventToEdit.date ? toLocalDateString(eventToEdit.date) : '',
         time: eventToEdit.time || '',
         location: eventToEdit.location || '',
         value: eventToEdit.value ? String(eventToEdit.value) : '',
@@ -73,7 +74,7 @@ export function EventFormDialog({
       setFormData({
         title: '',
         clientId: '',
-        date: defaultDate ? defaultDate.toISOString().split('T')[0] : '',
+        date: defaultDate ? toLocalDateString(defaultDate) : '',
         time: '',
         location: '',
         value: '',

@@ -31,7 +31,7 @@ import {
   Check,
   Loader2,
 } from 'lucide-react'
-import { formatCurrency, formatDate, formatShortDate } from '@/lib/formatters'
+import { formatCurrency, formatDate, formatShortDate, toLocalDateString } from '@/lib/formatters'
 import { Finance, FinanceStatus } from '@/types'
 import { toast } from 'sonner'
 import { ClientSelector } from '@/components/ClientSelector'
@@ -47,14 +47,14 @@ export function Financial() {
 
   // Mark as paid dialog
   const [payingFinance, setPayingFinance] = useState<Finance | null>(null)
-  const [paidDate, setPaidDate] = useState(new Date().toISOString().split('T')[0])
+  const [paidDate, setPaidDate] = useState(toLocalDateString(new Date()))
   const [isPayingSubmitting, setIsPayingSubmitting] = useState(false)
 
   // Manual finance form
   const [title, setTitle] = useState('')
   const [clientId, setClientId] = useState('')
   const [value, setValue] = useState<number>(0)
-  const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0])
+  const [dueDate, setDueDate] = useState(toLocalDateString(new Date()))
   const [paymentMethod, setPaymentMethod] = useState('PIX')
   const [status, setStatus] = useState<FinanceStatus>('Pendente')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -64,7 +64,7 @@ export function Financial() {
     setTitle('')
     setClientId('')
     setValue(0)
-    setDueDate(new Date().toISOString().split('T')[0])
+    setDueDate(toLocalDateString(new Date()))
     setPaymentMethod('PIX')
     setStatus('Pendente')
     setIsDialogOpen(true)
@@ -75,7 +75,7 @@ export function Financial() {
     setTitle(f.title)
     setClientId(f.clientId || '')
     setValue(f.value)
-    setDueDate(f.dueDate ? f.dueDate.split('T')[0] : new Date().toISOString().split('T')[0])
+    setDueDate(f.dueDate ? toLocalDateString(f.dueDate) : toLocalDateString(new Date()))
     setPaymentMethod(f.paymentMethod || 'PIX')
     setStatus(f.status)
     setIsDialogOpen(true)
@@ -346,7 +346,7 @@ export function Financial() {
                         size="sm"
                         onClick={() => {
                           setPayingFinance(fin)
-                          setPaidDate(new Date().toISOString().split('T')[0])
+                          setPaidDate(toLocalDateString(new Date()))
                         }}
                         className="h-8 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
                       >

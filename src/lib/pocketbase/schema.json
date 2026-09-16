@@ -29,19 +29,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "phone",
@@ -66,12 +61,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "economy",
-            "intermediate",
-            "advanced",
-            "premium"
-          ]
+          "selectValues": ["economy", "intermediate", "advanced", "premium"]
         }
       ],
       "indexes": [
@@ -132,19 +122,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "tradeName",
@@ -157,10 +142,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "PF",
-            "PJ"
-          ]
+          "selectValues": ["PF", "PJ"]
         },
         {
           "name": "addressData",
@@ -181,9 +163,7 @@
           "system": false
         }
       ],
-      "indexes": [
-        "CREATE INDEX idx_clients_user ON clients (user)"
-      ]
+      "indexes": ["CREATE INDEX idx_clients_user ON clients (user)"]
     },
     {
       "name": "events",
@@ -245,19 +225,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "quote",
@@ -283,11 +258,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "event",
-            "pre_reservation",
-            "receivable"
-          ]
+          "selectValues": ["event", "pre_reservation", "receivable"]
         },
         {
           "name": "notes",
@@ -300,13 +271,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "Pré-reserva",
-            "Confirmado",
-            "Pendente",
-            "Concluído",
-            "Cancelado"
-          ]
+          "selectValues": ["Pré-reserva", "Confirmado", "Pendente", "Concluído", "Cancelado"]
         }
       ],
       "indexes": [
@@ -370,19 +335,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "quote",
@@ -414,13 +374,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "Previsto",
-            "Pendente",
-            "Pago",
-            "Atrasado",
-            "Cancelado"
-          ]
+          "selectValues": ["Previsto", "Pendente", "Pago", "Atrasado", "Cancelado"]
         }
       ],
       "indexes": [
@@ -482,19 +436,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "eventName",
@@ -606,11 +555,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "pending",
-            "synced",
-            "error"
-          ]
+          "selectValues": ["pending", "synced", "error"]
         },
         {
           "name": "lastSyncAt",
@@ -625,9 +570,7 @@
           "system": false
         }
       ],
-      "indexes": [
-        "CREATE INDEX idx_quotes_user ON quotes (user)"
-      ]
+      "indexes": ["CREATE INDEX idx_quotes_user ON quotes (user)"]
     },
     {
       "name": "contracts",
@@ -690,35 +633,24 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "Rascunho",
-            "Enviado",
-            "Assinado"
-          ]
+          "selectValues": ["Rascunho", "Enviado", "Assinado"]
         },
         {
           "name": "created",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": [
-        "CREATE INDEX idx_contracts_user ON contracts (user)"
-      ]
+      "indexes": ["CREATE INDEX idx_contracts_user ON contracts (user)"]
     }
   ]
 }

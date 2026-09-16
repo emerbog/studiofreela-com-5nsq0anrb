@@ -60,6 +60,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { exportQuoteToPdf, generateQuotePdfFilename, shareQuotePdf } from '@/lib/quote-pdf'
+import { toLocalDateString } from '@/lib/formatters'
 
 interface QuoteFormSheetProps {
   triggerAsChild?: React.ReactNode
@@ -105,11 +106,11 @@ export function QuoteFormSheet({
   // Step 2: Evento
   const [eventName, setEventName] = useState('')
   const [eventLocation, setEventLocation] = useState('')
-  const [eventStartDate, setEventStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [eventStartDate, setEventStartDate] = useState(toLocalDateString(new Date()))
   const [eventStartTime, setEventStartTime] = useState('09:00')
-  const [eventEndDate, setEventEndDate] = useState(new Date().toISOString().split('T')[0])
+  const [eventEndDate, setEventEndDate] = useState(toLocalDateString(new Date()))
   const [eventEndTime, setEventEndTime] = useState('18:00')
-  const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split('T')[0])
+  const [quoteDate, setQuoteDate] = useState(toLocalDateString(new Date()))
   const [validityDays, setValidityDays] = useState(15)
   const [notes, setNotes] = useState('')
 
@@ -157,7 +158,7 @@ export function QuoteFormSheet({
     {
       id: 'pay_1',
       description: 'Sinal de reserva (50%)',
-      dueDate: new Date().toISOString().split('T')[0],
+      dueDate: toLocalDateString(new Date()),
       value: 750,
       percentage: 50,
       method: 'PIX',
@@ -165,7 +166,7 @@ export function QuoteFormSheet({
     {
       id: 'pay_2',
       description: 'Saldo no dia do evento (50%)',
-      dueDate: new Date().toISOString().split('T')[0],
+      dueDate: toLocalDateString(new Date()),
       value: 750,
       percentage: 50,
       method: 'PIX',
@@ -226,18 +227,18 @@ export function QuoteFormSheet({
       setEventLocation(quoteToEdit.eventLocation || '')
       setEventStartDate(
         quoteToEdit.eventStartDate
-          ? quoteToEdit.eventStartDate.slice(0, 10)
-          : quoteToEdit.date.slice(0, 10),
+          ? toLocalDateString(quoteToEdit.eventStartDate)
+          : toLocalDateString(quoteToEdit.date),
       )
       setEventStartTime(quoteToEdit.eventStartTime || '09:00')
       setEventEndDate(
         quoteToEdit.eventEndDate
-          ? quoteToEdit.eventEndDate.slice(0, 10)
-          : quoteToEdit.date.slice(0, 10),
+          ? toLocalDateString(quoteToEdit.eventEndDate)
+          : toLocalDateString(quoteToEdit.date),
       )
       setEventEndTime(quoteToEdit.eventEndTime || '18:00')
       setQuoteDate(
-        quoteToEdit.date ? quoteToEdit.date.slice(0, 10) : new Date().toISOString().split('T')[0],
+        quoteToEdit.date ? toLocalDateString(quoteToEdit.date) : toLocalDateString(new Date()),
       )
       setValidityDays(quoteToEdit.validityDays || 15)
       setNotes(quoteToEdit.notes || '')
@@ -343,7 +344,7 @@ export function QuoteFormSheet({
 
   // Helper quick actions for payment schedule
   const applyPresetPaymentPlan = (type: 'full' | 'half_half' | 'three_parts') => {
-    const due = eventStartDate || new Date().toISOString().split('T')[0]
+    const due = eventStartDate || toLocalDateString(new Date())
     if (type === 'full') {
       setPaymentSchedule([
         {
@@ -362,7 +363,7 @@ export function QuoteFormSheet({
         {
           id: `pay_${Date.now()}_1`,
           description: 'Sinal para reserva da data (50%)',
-          dueDate: new Date().toISOString().split('T')[0],
+          dueDate: toLocalDateString(new Date()),
           value: half,
           percentage: 50,
           method: 'PIX',
@@ -384,7 +385,7 @@ export function QuoteFormSheet({
         {
           id: `pay_${Date.now()}_1`,
           description: 'Sinal de reserva (40%)',
-          dueDate: new Date().toISOString().split('T')[0],
+          dueDate: toLocalDateString(new Date()),
           value: part1,
           percentage: 40,
           method: 'PIX',
@@ -478,7 +479,7 @@ export function QuoteFormSheet({
       {
         id: `pay_${Date.now()}_${prev.length + 1}`,
         description: `Parcela ${prev.length + 1}`,
-        dueDate: eventStartDate || new Date().toISOString().split('T')[0],
+        dueDate: eventStartDate || toLocalDateString(new Date()),
         value: remaining > 0 ? remaining : 0,
         method: 'PIX',
       },

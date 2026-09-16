@@ -22,7 +22,13 @@ import {
   AlertCircle,
   ExternalLink,
 } from 'lucide-react'
-import { formatCurrency, formatDate, formatShortDate } from '@/lib/formatters'
+import {
+  formatCurrency,
+  formatDate,
+  formatShortDate,
+  toLocalDateString,
+  parseLocalDate,
+} from '@/lib/formatters'
 import { AppEvent, Finance, Quote } from '@/types'
 import { EventFormDialog } from '@/components/EventFormDialog'
 import { QuotePreviewDialog } from '@/components/QuotePreviewDialog'
@@ -41,13 +47,13 @@ export function Agenda() {
   const [isQuoteFormOpen, setIsQuoteFormOpen] = useState(false)
 
   // Filter events by selected date (match startDate or within start/end range)
-  const selectedDateStr = selectedDate ? selectedDate.toISOString().split('T')[0] : ''
+  const selectedDateStr = toLocalDateString(selectedDate)
 
   const eventsForSelectedDate = useMemo(() => {
     if (!selectedDateStr) return []
     return events.filter((e) => {
-      const start = e.date ? e.date.split('T')[0] : ''
-      const end = e.endDate ? e.endDate.split('T')[0] : start
+      const start = toLocalDateString(e.date)
+      const end = e.endDate ? toLocalDateString(e.endDate) : start
       return selectedDateStr >= start && selectedDateStr <= end
     })
   }, [events, selectedDateStr])
@@ -56,25 +62,39 @@ export function Agenda() {
   const financesForSelectedDate = useMemo(() => {
     if (!selectedDateStr) return []
     return finances.filter((f) => {
-      const due = f.dueDate ? f.dueDate.split('T')[0] : ''
+      const due = toLocalDateString(f.dueDate)
       return due === selectedDateStr
     })
   }, [finances, selectedDateStr])
 
-  // Calendar dates with dots
+  // Calendar dates with dots: expand multi-day events so all in-between days get the indicator
   const datesWithActivity = useMemo(() => {
     const set = new Set<string>()
     events.forEach((e) => {
-      if (e.date) {
-        set.add(e.date.split('T')[0])
-      }
-      if (e.endDate) {
-        set.add(e.endDate.split('T')[0])
+      const startStr = toLocalDateString(e.date)
+      const endStr = e.endDate ? toLocalDateString(e.endDate) : startStr
+      if (startStr) {
+        set.add(startStr)
+        if (endStr && endStr > startStr) {
+          // Preenche todos os dias do intervalo para eventos multidiários
+          const cur = parseLocalDate(startStr)
+          const target = parseLocalDate(endStr)
+          if (cur && target) {
+            // Limite de segurança de no máximo 60 dias para evitar loops
+            let count = 0
+            while (cur <= target && count < 60) {
+              set.add(toLocalDateString(cur))
+              cur.setDate(cur.getDate() + 1)
+              count++
+            }
+          }
+        }
       }
     })
     finances.forEach((f) => {
-      if (f.dueDate) {
-        set.add(f.dueDate.split('T')[0])
+      const dueStr = toLocalDateString(f.dueDate)
+      if (dueStr) {
+        set.add(dueStr)
       }
     })
     return set
@@ -172,7 +192,7 @@ export function Agenda() {
             className="rounded-md mx-auto"
             modifiers={{
               hasActivity: (date) => {
-                const s = date.toISOString().split('T')[0]
+                const s = toLocalDateString(date)
                 return datesWithActivity.has(s)
               },
             }}
@@ -187,7 +207,7 @@ export function Agenda() {
           <div className="flex items-center justify-between pb-2 border-b border-border/40">
             <h3 className="font-serif font-bold text-base sm:text-lg text-heading flex items-center gap-2">
               <CalendarIcon className="w-4 h-4 text-primary" />
-              {selectedDate ? formatDate(selectedDate.toISOString()) : 'Selecione um dia'}
+              {selectedDate ? formatDate(selectedDate) : 'Selecione um dia'}
             </h3>
             <span className="text-xs text-muted-foreground font-mono">
               {eventsForSelectedDate.length} evento(s) • {financesForSelectedDate.length}{' '}
@@ -330,11 +350,12 @@ export function Agenda() {
                         <span>
                           {ev.time || '09:00'}
                           {ev.endTime ? ` até ${ev.endTime}` : ''}
-                          {ev.endDate && ev.endDate.split('T')[0] !== ev.date.split('T')[0] && (
-                            <span className="text-[10px] ml-1 text-primary">
-                              (término {formatShortDate(ev.endDate)})
-                            </span>
-                          )}
+                          {ev.endDate &&
+                            toLocalDateString(ev.endDate) !== toLocalDateString(ev.date) && (
+                              <span className="text-[10px] ml-1 text-primary">
+                                (término {formatShortDate(ev.endDate)})
+                              </span>
+                            )}
                         </span>
                       </div>
 
@@ -374,8 +395,8 @@ export function Agenda() {
               {financesForSelectedDate.map((fin) => {
                 const client = clients.find((c) => c.id === fin.clientId)
                 const isPaid = fin.status === 'Pago'
-                const todayStr = new Date().toISOString().split('T')[0]
-                const dueStr = fin.dueDate ? fin.dueDate.split('T')[0] : ''
+                const todayStr = toLocalDateString(new Date())
+                const dueStr = toLocalDateString(fin.dueDate)
                 const isOverdue = !isPaid && dueStr && dueStr < todayStr
                 const isForecastOrPending = !isPaid && !isOverdue
 
@@ -457,6 +478,10 @@ export function Agenda() {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         eventToEdit={eventToEdit}
+        defaultDate={selectedDate}
+        onSuccess={() => {
+          // Mantém a data selecionada ou refresca
+        }}
       />
 
       {/* Quote form and preview dialogs */}
@@ -464,6 +489,15 @@ export function Agenda() {
         open={isQuoteFormOpen}
         onOpenChange={setIsQuoteFormOpen}
         quoteToEdit={quoteToEdit}
+        onSuccess={(savedQuote) => {
+          const targetDateStr = savedQuote.eventStartDate || savedQuote.date
+          if (targetDateStr) {
+            const parsed = parseLocalDate(targetDateStr)
+            if (parsed) {
+              setSelectedDate(parsed)
+            }
+          }
+        }}
       />
 
       <QuotePreviewDialog
