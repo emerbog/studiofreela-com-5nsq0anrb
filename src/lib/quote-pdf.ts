@@ -1,5 +1,5 @@
 import { Quote, Client, UserProfile } from '@/types'
-import { formatCurrency, formatDate, formatShortDate } from '@/lib/formatters'
+import { formatCurrency, formatShortDate } from '@/lib/formatters'
 import { toast } from 'sonner'
 
 export function generateQuotePdfFilename(quote: Quote, client?: Client): string {
@@ -10,11 +10,12 @@ export function generateQuotePdfFilename(quote: Quote, client?: Client): string 
 }
 
 /**
- * Utilitário de escape de texto para streams PDF padrão (WinAnsiEncoding)
+ * Utilitário de escape de texto para streams PDF padrão (WinAnsiEncoding).
+ * Normaliza acentos para caracteres compatíveis com fontes padrão Type1 (Helvetica)
+ * para garantir compatibilidade com visualizadores e assinadores do ITI / GOV.BR.
  */
 function pdfEscapeText(text: string): string {
   if (!text) return ''
-  // Normaliza acentos para compatibilidade com fontes Helvetica padrão de PDFs do ITI / GOV.BR
   const asciiText = text
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -26,10 +27,67 @@ function pdfEscapeText(text: string): string {
 }
 
 /**
+ * Aproximação da largura de texto em pontos usando média de proporções da Helvetica
+ */
+function estimateTextWidth(text: string, fontSize: number, bold: boolean = false): number {
+  if (!text) return 0
+  const factor = bold ? 0.54 : 0.5
+  return text.length * fontSize * factor
+}
+
+/**
+ * Divide um texto em linhas respeitando uma largura máxima em pontos
+ */
+function wrapText(
+  text: string,
+  maxWidth: number,
+  fontSize: number,
+  bold: boolean = false,
+): string[] {
+  if (!text) return []
+  const clean = text.replace(/[\r\n]+/g, ' ').trim()
+  if (!clean) return []
+
+  const words = clean.split(/\s+/)
+  const lines: string[] = []
+  let currentLine = ''
+
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word
+    const testWidth = estimateTextWidth(testLine, fontSize, bold)
+    if (testWidth <= maxWidth) {
+      currentLine = testLine
+    } else {
+      if (currentLine) {
+        lines.push(currentLine)
+        currentLine = word
+      } else {
+        // Se uma única palavra for maior que a largura, trunca ou força quebra
+        lines.push(word)
+        currentLine = ''
+      }
+    }
+  }
+  if (currentLine) {
+    lines.push(currentLine)
+  }
+  return lines
+}
+
+/**
  * Constrói um arquivo PDF binário real (formato PDF-1.4 compatível com assinadores ITI / GOV.BR)
- * com layout formal de 2 páginas:
- * Página 1: Cabeçalho, Partes, Escopo de Serviços, Equipamentos e Cronograma
- * Página 2: Resumo Financeiro, Condições Gerais, e ÁREAS RESERVADAS GOV.BR (4cm livres)
+ * com layout formal e profissional de 2 páginas A4 (595 x 842 pt).
+ *
+ * Correções de Layout Implementadas:
+ * 1. Validade da proposta contida dentro da margem direita (badge de emissão/validade alinhado à direita de 555 pt).
+ * 2. Tabela de serviços com colunas proporcionais, cabeçalhos legíveis e valores perfeitamente alinhados à direita.
+ * 3. Descrições do calendário de pagamentos com quebra de linha (wrap) em 2 linhas, sem corte de texto.
+ * 4. Tabela de parcelas do calendário com colunas claras e alinhadas: Parcela, Vencimento, Meio e Valor.
+ * 5. Espaçamento vertical balanceado para "Disposições Gerais & Instruções de Assinatura Eletrônica", sem sobreposição.
+ * 6. Instruções completas do GOV.BR formatadas com texto fluido dentro de caixa adaptável.
+ * 7. Rodapé legal e notas pós-assinatura formatados em linhas limpas e bem posicionadas.
+ * 8. Distribuição equilibrada do espaço entre as 2 páginas: página 1 inclui Escopo, Equipamentos e Condições Logísticas;
+ *    página 2 inclui Calendário detalhado, Resumo Financeiro, Disposições GOV.BR e 2 áreas amplas de assinatura.
  */
 export function buildQuoteBinaryPdfBlob(
   quote: Quote,
@@ -47,6 +105,8 @@ export function buildQuoteBinaryPdfBlob(
   const items = quote.items || []
   const equipments = quote.equipments || []
   const schedule = quote.paymentSchedule || []
+  const logistics = quote.logistics
+  const overtime = quote.overtimeRule
 
   const servicesSubtotal = items.reduce(
     (acc, it) => acc + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
@@ -71,390 +131,737 @@ export function buildQuoteBinaryPdfBlob(
 
   // -------------------------------------------------------------
   // PÁGINA 1: OPERAÇÕES DE STREAM
+  // Margens: esquerda 40 pt, direita 555 pt (largura útil 515 pt)
   // -------------------------------------------------------------
   const streamPage1: string[] = [
     'q',
     // Barra de destaque do topo
     '0.47 0.21 0.04 rg', // tom bronze Studio Freela
-    '40 802 515 4 re f',
+    '40 806 515 4 re f',
 
-    // Cabeçalho
+    // Cabeçalho Freelancer (lado esquerdo)
     'BT',
-    '/F2 16 Tf',
+    '/F2 14 Tf',
     '0.47 0.21 0.04 rg',
-    '40 780 Td',
+    '40 786 Td',
     `(${pdfEscapeText(user?.name || 'STUDIO FREELA - SERVICOS PROFISSIONAIS')}) Tj`,
     'ET',
 
     'BT',
-    '/F1 9 Tf',
-    '0.35 0.35 0.35 rg',
-    '40 766 Td',
-    `(${pdfEscapeText(user?.profession || 'Prestacao de Servicos Especializados')} | ${pdfEscapeText(user?.email || '')} ${pdfEscapeText(user?.phone ? ' | ' + user.phone : '')}) Tj`,
-    'ET',
-
-    // Caixa de identificação da proposta (canto superior direito)
-    'BT',
-    '/F2 12 Tf',
-    '0.70 0.33 0.04 rg',
-    '400 780 Td',
-    `(${pdfEscapeText(quote.number || 'ORC-000000')}) Tj`,
-    'ET',
-
-    'BT',
     '/F1 8.5 Tf',
-    '0.3 0.3 0.3 rg',
-    '400 766 Td',
-    `(${pdfEscapeText(`Emissao: ${emissionDate} | Validade: ${validUntilStr} (${validDays}d)`)}) Tj`,
+    '0.35 0.35 0.35 rg',
+    '40 773 Td',
+    `(${pdfEscapeText(user?.profession || 'Prestacao de Servicos Especializados')}) Tj`,
+    '40 762 Td',
+    `(${pdfEscapeText([user?.email, user?.phone, user?.cpfCnpj ? `Doc: ${user.cpfCnpj}` : ''].filter(Boolean).join(' • '))}) Tj`,
     'ET',
 
-    // Linha divisória
+    // Bloco de Identificação e Validade (lado direito - cabe perfeitamente até a margem 555)
+    // Número do Orçamento
+    'BT',
+    '/F2 11 Tf',
+    '0.70 0.33 0.04 rg',
+    '385 786 Td',
+    `(${pdfEscapeText(`ORCAMENTO: ${quote.number || 'ORC-000000'}`)}) Tj`,
+    'ET',
+
+    // Emissão e Validade - linhas separadas para nunca cortar na margem direita
+    'BT',
+    '/F1 8 Tf',
+    '0.30 0.30 0.30 rg',
+    '385 773 Td',
+    `(${pdfEscapeText(`Data de Emissao: ${emissionDate}`)}) Tj`,
+    '/F2 8 Tf',
+    '0.47 0.21 0.04 rg',
+    '385 762 Td',
+    `(${pdfEscapeText(`Validade: ${validUntilStr} (${validDays} dias)`)}) Tj`,
+    'ET',
+
+    // Linha divisória do cabeçalho
     '0.85 0.85 0.85 RG',
     '1 w',
-    '40 754 m 555 754 l S',
+    '40 750 m 555 750 l S',
+  ]
 
-    // 1. PARTES ENVOLVIDAS
-    '0.96 0.95 0.94 rg',
-    '40 682 515 62 re f',
-    '0.85 0.80 0.75 RG',
-    '40 682 515 62 re S',
+  // 1. PARTES ENVOLVIDAS (Contratado & Contratante)
+  streamPage1.push(
+    '0.97 0.96 0.95 rg',
+    '40 682 515 60 re f',
+    '0.86 0.82 0.77 RG',
+    '0.8 w',
+    '40 682 515 60 re S',
 
+    // Contratado
     'BT',
-    '/F2 9 Tf',
+    '/F2 8.5 Tf',
     '0.60 0.20 0.07 rg',
-    '50 730 Td',
-    '(CONTRATADO / PRESTADOR:) Tj',
+    '50 728 Td',
+    '(PRESTADOR / CONTRATADO:) Tj',
     'ET',
     'BT',
-    '/F1 8.5 Tf',
+    '/F2 8.5 Tf',
     '0.15 0.15 0.15 rg',
-    '50 716 Td',
+    '50 715 Td',
     `(${pdfEscapeText(user?.name || 'Profissional Studio Freela')}) Tj`,
     'ET',
     'BT',
     '/F1 8 Tf',
     '0.35 0.35 0.35 rg',
-    '50 702 Td',
-    `(${pdfEscapeText(user?.profession || 'Prestador Autonomo')} - ${pdfEscapeText(user?.email || '')}) Tj`,
+    '50 703 Td',
+    `(${pdfEscapeText(user?.profession || 'Prestador Autonomo')}) Tj`,
+    '50 691 Td',
+    `(${pdfEscapeText([user?.email, user?.phone].filter(Boolean).join(' • '))}) Tj`,
     'ET',
 
+    // Contratante
     'BT',
-    '/F2 9 Tf',
+    '/F2 8.5 Tf',
     '0.60 0.20 0.07 rg',
-    '310 730 Td',
-    '(CONTRATANTE / CLIENTE:) Tj',
+    '310 728 Td',
+    '(CLIENTE / CONTRATANTE:) Tj',
     'ET',
     'BT',
-    '/F1 8.5 Tf',
+    '/F2 8.5 Tf',
     '0.15 0.15 0.15 rg',
-    '310 716 Td',
-    `(${pdfEscapeText(client?.name || 'Cliente')} ${pdfEscapeText(client?.tradeName ? '(' + client.tradeName + ')' : '')}) Tj`,
+    '310 715 Td',
+    `(${pdfEscapeText((client?.name || 'Cliente').slice(0, 42))}) Tj`,
     'ET',
     'BT',
     '/F1 8 Tf',
     '0.35 0.35 0.35 rg',
-    '310 702 Td',
-    `(${pdfEscapeText(`Doc: ${client?.document || 'N/I'} | Tel: ${client?.phone || 'N/I'}`)}) Tj`,
+    '310 703 Td',
+    `(${pdfEscapeText(`Doc: ${client?.document || 'N/I'} • Tel: ${client?.phone || 'N/I'}`)}) Tj`,
+    '310 691 Td',
+    `(${pdfEscapeText(client?.email ? `Email: ${client.email}` : client?.tradeName ? `Fantasia: ${client.tradeName}` : 'Conforme cadastro comercial')}) Tj`,
     'ET',
+  )
 
-    // 2. CRONOGRAMA E EVENTO
+  // 2. CRONOGRAMA E DADOS DO PROJETO / EVENTO
+  streamPage1.push(
     'BT',
-    '/F2 10 Tf',
+    '/F2 9.5 Tf',
     '0.47 0.21 0.04 rg',
     '40 662 Td',
     '(1. DADOS DO PROJETO & CRONOGRAMA) Tj',
     'ET',
 
     '0.98 0.98 0.98 rg',
-    '40 606 515 48 re f',
+    '40 616 515 42 re f',
     '0.88 0.88 0.88 RG',
-    '40 606 515 48 re S',
+    '0.8 w',
+    '40 616 515 42 re S',
 
     'BT',
-    '/F2 9 Tf',
+    '/F2 8.5 Tf',
     '0.15 0.15 0.15 rg',
-    '50 638 Td',
+    '50 644 Td',
     `(${pdfEscapeText(`Projeto/Evento: ${quote.eventName || 'Servico Comercial Sob Demanda'}`)}) Tj`,
     'ET',
     'BT',
-    '/F1 8.5 Tf',
-    '0.3 0.3 0.3 rg',
-    '50 624 Td',
-    `(${pdfEscapeText(`Inicio: ${quote.eventStartDate ? formatShortDate(quote.eventStartDate) : emissionDate} as ${quote.eventStartTime || '09:00'} | Termino: ${quote.eventEndDate ? formatShortDate(quote.eventEndDate) : emissionDate} as ${quote.eventEndTime || '18:00'}`)}) Tj`,
-    'ET',
-    'BT',
     '/F1 8 Tf',
-    '0.35 0.35 0.35 rg',
-    '50 612 Td',
-    `(${pdfEscapeText(`Local: ${quote.eventLocation || 'A definir / Conforme alinhamento'}`)}) Tj`,
+    '0.30 0.30 0.30 rg',
+    '50 632 Td',
+    `(${pdfEscapeText(`Periodo: ${quote.eventStartDate ? formatShortDate(quote.eventStartDate) : emissionDate} as ${quote.eventStartTime || '09:00'} ate ${quote.eventEndDate ? formatShortDate(quote.eventEndDate) : emissionDate} as ${quote.eventEndTime || '18:00'}`)}) Tj`,
+    '50 622 Td',
+    `(${pdfEscapeText(`Local de Execucao: ${quote.eventLocation || 'A definir / Conforme alinhamento previo com o cliente'}`)}) Tj`,
     'ET',
+  )
 
-    // 3. ESCOPO DOS SERVIÇOS
+  // 3. ESCOPO DOS SERVIÇOS CONTRATADOS
+  // Largura útil total: 515 pt (de X=40 até X=555).
+  // Distribuição de colunas:
+  // - Descrição: 40 até 330 (largura 290 pt)
+  // - Quantidade: 335 até 375 (largura 40 pt, texto em 355)
+  // - Unidade: 375 até 415 (largura 40 pt, texto em 385)
+  // - Unitário: 415 até 485 (largura 70 pt, texto em 480 alinhado à direita)
+  // - Total: 485 até 555 (largura 70 pt, texto em 550 alinhado à direita)
+  streamPage1.push(
     'BT',
-    '/F2 10 Tf',
+    '/F2 9.5 Tf',
     '0.47 0.21 0.04 rg',
-    '40 586 Td',
+    '40 596 Td',
     '(2. ESCOPO DOS SERVICOS CONTRATADOS) Tj',
     'ET',
 
     // Cabeçalho da tabela de serviços
-    '0.92 0.92 0.92 rg',
-    '40 564 515 16 re f',
+    '0.91 0.91 0.91 rg',
+    '40 576 515 16 re f',
+    '0.80 0.80 0.80 RG',
+    '0.8 w',
+    '40 576 515 16 re S',
+
     'BT',
     '/F2 8 Tf',
-    '0.2 0.2 0.2 rg',
-    '46 568 Td',
-    '(ITEM / DESCRICAO DO SERVICO) Tj',
-    '330 568 Td',
-    '(UN.) Tj',
-    '370 568 Td',
+    '0.20 0.20 0.20 rg',
+    '46 580 Td',
+    '(DESCRICAO DO SERVICO) Tj',
+    '340 580 Td',
     '(QTD) Tj',
-    '430 568 Td',
+    '380 580 Td',
+    '(UN.) Tj',
+    '430 580 Td',
     '(UNITARIO) Tj',
-    '490 568 Td',
+    '510 580 Td',
     '(TOTAL) Tj',
     'ET',
-  ]
+  )
 
-  // Linhas da tabela de serviços na página 1
-  let currentY = 548
-  const maxItems = Math.min(items.length, 10)
-  for (let i = 0; i < maxItems; i++) {
+  let curY = 562
+  const maxServicesToShow = Math.min(items.length, 7)
+
+  for (let i = 0; i < maxServicesToShow; i++) {
     const it = items[i]
-    const itemTotal = (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0)
+    const qty = Number(it.quantity) || 1
+    const unitPrice = Number(it.unitPrice) || 0
+    const itemTotal = qty * unitPrice
+
+    const descLines = wrapText(it.description || 'Servico sob demanda', 270, 8, false).slice(0, 2)
+    const rowHeight = descLines.length > 1 ? 22 : 16
+
+    // Fundo zebrado sutil
+    if (i % 2 === 1) {
+      streamPage1.push(`0.98 0.98 0.98 rg 40 ${curY - (rowHeight - 13)} 515 ${rowHeight} re f`)
+    }
+
+    // Linha inferior divisória
     streamPage1.push(
-      '0.97 0.97 0.97 RG',
-      `40 ${currentY - 4} m 555 ${currentY - 4} l S`,
+      '0.90 0.90 0.90 RG',
+      '0.5 w',
+      `40 ${curY - (rowHeight - 13)} m 555 ${curY - (rowHeight - 13)} l S`,
+    )
+
+    // Descrição
+    streamPage1.push(
       'BT',
       '/F1 8 Tf',
       '0.15 0.15 0.15 rg',
-      `46 ${currentY} Td`,
-      `(${pdfEscapeText(it.description.slice(0, 50))}) Tj`,
-      `330 ${currentY} Td`,
-      `(${pdfEscapeText(it.unit || 'sv')}) Tj`,
-      `375 ${currentY} Td`,
-      `(${it.quantity}) Tj`,
-      `425 ${currentY} Td`,
-      `(${pdfEscapeText(formatCurrency(it.unitPrice))}) Tj`,
-      `490 ${currentY} Td`,
-      `(${pdfEscapeText(formatCurrency(itemTotal))}) Tj`,
+      `46 ${curY} Td`,
+      `(${pdfEscapeText(descLines[0])}) Tj`,
+    )
+    if (descLines[1]) {
+      streamPage1.push(`46 ${curY - 9} Td`, `(${pdfEscapeText(descLines[1])}) Tj`)
+    }
+    streamPage1.push('ET')
+
+    // Quantidade, Unidade, Unitário e Total alinhados
+    const unitPriceStr = formatCurrency(unitPrice)
+    const itemTotalStr = formatCurrency(itemTotal)
+
+    // Ajusta coordenadas X para ficarem alinhadas à direita dentro da respectiva coluna
+    const unitPriceX = 478 - estimateTextWidth(unitPriceStr, 8, false)
+    const itemTotalX = 550 - estimateTextWidth(itemTotalStr, 8, true)
+
+    streamPage1.push(
+      'BT',
+      '/F1 8 Tf',
+      '0.20 0.20 0.20 rg',
+      `345 ${curY} Td`,
+      `(${qty}) Tj`,
+      `382 ${curY} Td`,
+      `(${pdfEscapeText((it.unit || 'sv').slice(0, 8))}) Tj`,
+      `${unitPriceX} ${curY} Td`,
+      `(${pdfEscapeText(unitPriceStr)}) Tj`,
+      '/F2 8 Tf',
+      '0.15 0.15 0.15 rg',
+      `${itemTotalX} ${curY} Td`,
+      `(${pdfEscapeText(itemTotalStr)}) Tj`,
       'ET',
     )
-    currentY -= 16
+
+    curY -= rowHeight
   }
 
-  // Rodapé da Página 1 com instrução de continuidade
+  if (items.length > maxServicesToShow) {
+    streamPage1.push(
+      'BT',
+      '/F1 7.5 Tf',
+      '0.45 0.45 0.45 rg',
+      `46 ${curY - 2} Td`,
+      `(${pdfEscapeText(`... e mais ${items.length - maxServicesToShow} item(ns) detalhados no anexo comercial`)}) Tj`,
+      'ET',
+    )
+    curY -= 14
+  }
+
+  // 4. TABELA DE EQUIPAMENTOS (se houver no orçamento)
+  if (equipments.length > 0 && curY > 230) {
+    curY -= 12
+    streamPage1.push(
+      'BT',
+      '/F2 9.5 Tf',
+      '0.47 0.21 0.04 rg',
+      `40 ${curY} Td`,
+      '(3. EQUIPAMENTOS & ESTRUTURA FORNECIDA) Tj',
+      'ET',
+    )
+    curY -= 16
+
+    streamPage1.push(
+      '0.91 0.91 0.91 rg',
+      `40 ${curY} 515 15 re f`,
+      '0.80 0.80 0.80 RG',
+      '0.8 w',
+      `40 ${curY} 515 15 re S`,
+      'BT',
+      '/F2 7.5 Tf',
+      '0.20 0.20 0.20 rg',
+      `46 ${curY + 4} Td`,
+      '(ITEM / EQUIPAMENTO) Tj',
+      `340 ${curY + 4} Td`,
+      '(QTD) Tj',
+      `420 ${curY + 4} Td`,
+      '(STATUS / VALOR) Tj',
+      `510 ${curY + 4} Td`,
+      '(TOTAL) Tj',
+      'ET',
+    )
+    curY -= 12
+
+    const maxEqToShow = Math.min(equipments.length, 3)
+    for (let e = 0; e < maxEqToShow; e++) {
+      const eq = equipments[e]
+      const eqQty = Number(eq.quantity) || 1
+      const eqUnit = Number(eq.unitPrice) || 0
+      const eqTotal = eq.includedInService ? 0 : eqQty * eqUnit
+      const eqTotalStr = eq.includedInService ? 'Incluso' : formatCurrency(eqTotal)
+      const eqStatusStr = eq.includedInService ? 'Incluso no servico' : formatCurrency(eqUnit)
+      const eqTotalX = 550 - estimateTextWidth(eqTotalStr, 7.5, !eq.includedInService)
+
+      streamPage1.push(
+        '0.92 0.92 0.92 RG',
+        '0.5 w',
+        `40 ${curY - 2} m 555 ${curY - 2} l S`,
+        'BT',
+        '/F1 7.5 Tf',
+        '0.20 0.20 0.20 rg',
+        `46 ${curY + 1} Td`,
+        `(${pdfEscapeText(eq.description.slice(0, 50))}) Tj`,
+        `345 ${curY + 1} Td`,
+        `(${eqQty}) Tj`,
+        `410 ${curY + 1} Td`,
+        `(${pdfEscapeText(eqStatusStr)}) Tj`,
+        '/F2 7.5 Tf',
+        eq.includedInService ? '0.20 0.55 0.25 rg' : '0.15 0.15 0.15 rg',
+        `${eqTotalX} ${curY + 1} Td`,
+        `(${pdfEscapeText(eqTotalStr)}) Tj`,
+        'ET',
+      )
+      curY -= 13
+    }
+  }
+
+  // 5. CONDIÇÕES CONTRATUAIS & LOGÍSTICA (Hora Extra, Refeição, Transporte, Hospedagem)
+  // Preenche harmonicamente o terço inferior da página 1 evitando grandes espaços vazios
+  curY -= 12
+  const boxHeight = 70
+  streamPage1.push(
+    'BT',
+    '/F2 9.5 Tf',
+    '0.47 0.21 0.04 rg',
+    `40 ${curY} Td`,
+    '(4. CONDICOES CONTRATUAIS, HORA EXTRA & LOGISTICA) Tj',
+    'ET',
+  )
+  curY -= boxHeight + 6
+
+  // Caixa de logística
+  streamPage1.push(
+    '0.97 0.97 0.98 rg',
+    `40 ${curY} 515 ${boxHeight} re f`,
+    '0.85 0.85 0.88 RG',
+    '0.8 w',
+    `40 ${curY} 515 ${boxHeight} re S`,
+  )
+
+  const overtimeText = overtime?.enabled
+    ? `Hora extra: ${formatCurrency(overtime.hourlyRate)}/h com tolerancia de ${overtime.graceMinutes || 0} min.`
+    : 'Hora extra: Nao prevista ou sob consulta previa.'
+
+  const mealText =
+    logistics?.meal?.type === 'contractor'
+      ? 'Alimentacao: Fornecida diretamente pelo contratante no local do evento.'
+      : logistics?.meal?.type === 'contracted'
+        ? `Alimentacao: Providenciada pelo profissional (${formatCurrency(logistics.meal.chargedAmount || 0)} incluso no total).`
+        : 'Alimentacao: Nao se aplica a este escopo.'
+
+  const transportText =
+    logistics?.transport?.type === 'contractor'
+      ? 'Transporte: Custos e deslocamentos sob responsabilidade direta do contratante.'
+      : logistics?.transport?.type === 'contracted'
+        ? `Transporte: Incluso no orcamento (${formatCurrency(logistics.transport.chargedAmount || 0)} incluso no total).`
+        : 'Transporte: Nao se aplica ou sob responsabilidade do prestador.'
+
+  const lodgingText =
+    logistics?.lodging?.type === 'contractor'
+      ? 'Hospedagem: Reservada e faturada diretamente pelo contratante.'
+      : logistics?.lodging?.type === 'contracted'
+        ? `Hospedagem: Inclusa no orcamento (${formatCurrency(logistics.lodging.chargedAmount || 0)} incluso no total).`
+        : 'Hospedagem: Nao necessaria para esta prestacao.'
+
+  streamPage1.push(
+    'BT',
+    '/F1 7.5 Tf',
+    '0.25 0.25 0.25 rg',
+    `50 ${curY + 54} Td`,
+    `(${pdfEscapeText(`• ${overtimeText}`)}) Tj`,
+    `50 ${curY + 41} Td`,
+    `(${pdfEscapeText(`• ${mealText}`)}) Tj`,
+    `50 ${curY + 28} Td`,
+    `(${pdfEscapeText(`• ${transportText}`)}) Tj`,
+    `50 ${curY + 15} Td`,
+    `(${pdfEscapeText(`• ${lodgingText}`)}) Tj`,
+    'ET',
+  )
+
+  // Rodapé da Página 1
   streamPage1.push(
     '0.85 0.85 0.85 RG',
+    '0.8 w',
     '40 45 m 555 45 l S',
     'BT',
     '/F1 7.5 Tf',
-    '0.5 0.5 0.5 rg',
-    '40 34 Td',
-    `(${pdfEscapeText(`Studio Freela • Proposta ${quote.number || 'ORC'} • Pagina 1 de 2 • Continua na pagina 2 para resumo e assinatura GOV.BR`)}) Tj`,
+    '0.50 0.50 0.50 rg',
+    '40 33 Td',
+    `(${pdfEscapeText(`Studio Freela • Proposta ${quote.number || 'ORC'} • Pagina 1 de 2 • Continua na pagina 2 para condicoes financeiras e assinaturas`)}) Tj`,
     'ET',
     'Q',
   )
 
   // -------------------------------------------------------------
-  // PÁGINA 2: CONDICOES, TOTAIS E ÁREAS LIVRES GOV.BR
+  // PÁGINA 2: CONDICOES FINANCEIRAS, TOTAIS E ÁREAS LIVRES GOV.BR
+  // Altura total: 842 pt.
   // -------------------------------------------------------------
   const streamPage2: string[] = [
     'q',
     // Barra superior
     '0.47 0.21 0.04 rg',
-    '40 802 515 4 re f',
+    '40 806 515 4 re f',
 
+    // Título do topo da página 2
     'BT',
     '/F2 11 Tf',
     '0.47 0.21 0.04 rg',
-    '40 782 Td',
+    '40 786 Td',
     `(${pdfEscapeText(`PROPOSTA COMERCIAL ${quote.number || 'ORC'} - CONDICOES FINANCEIRAS & ASSINATURA`)}) Tj`,
     'ET',
 
-    // 4. RESUMO FINANCEIRO E CALENDÁRIO
+    // Linha fina de separação
+    '0.85 0.85 0.85 RG',
+    '0.8 w',
+    '40 774 m 555 774 l S',
+
+    // Título da Seção Financeira
     'BT',
     '/F2 9.5 Tf',
-    '0.2 0.2 0.2 rg',
-    '40 760 Td',
-    '(3. CALENDARIO DE PAGAMENTO & TOTAIS) Tj',
-    'ET',
-
-    // Tabela do calendário
-    '0.94 0.94 0.94 rg',
-    '40 738 310 16 re f',
-    'BT',
-    '/F2 8 Tf',
-    '0.2 0.2 0.2 rg',
-    '46 742 Td',
-    '(PARCELA) Tj',
-    '180 742 Td',
-    '(VENCIMENTO) Tj',
-    '255 742 Td',
-    '(MEIO) Tj',
-    '300 742 Td',
-    '(VALOR) Tj',
+    '0.20 0.20 0.20 rg',
+    '40 758 Td',
+    '(5. CALENDARIO DE PAGAMENTO & RESUMO CONSOLIDADO) Tj',
     'ET',
   ]
 
-  let schedY = 722
-  for (let s = 0; s < Math.min(schedule.length, 4); s++) {
-    const sc = schedule[s]
-    streamPage2.push(
-      '0.96 0.96 0.96 RG',
-      `40 ${schedY - 3} m 350 ${schedY - 3} l S`,
-      'BT',
-      '/F1 8 Tf',
-      '0.2 0.2 0.2 rg',
-      `46 ${schedY} Td`,
-      `(${pdfEscapeText(sc.description.slice(0, 24))}) Tj`,
-      `180 ${schedY} Td`,
-      `(${pdfEscapeText(formatShortDate(sc.dueDate))}) Tj`,
-      `255 ${schedY} Td`,
-      `(${pdfEscapeText(sc.method)}) Tj`,
-      `295 ${schedY} Td`,
-      `(${pdfEscapeText(formatCurrency(sc.value))}) Tj`,
-      'ET',
-    )
-    schedY -= 15
-  }
-
-  // Caixa de Total Geral (lado direito)
+  // TABELA DO CALENDÁRIO (Lado Esquerdo: X 40 a 345 = 305 pt de largura)
+  // Colunas do calendário:
+  // - Parcela/Descrição: 40 a 160 (120 pt) - quebra em 2 linhas se necessário
+  // - Vencimento: 160 a 225 (65 pt)
+  // - Meio: 225 a 275 (50 pt)
+  // - Valor: 275 a 345 (70 pt, alinhado à direita em 340)
   streamPage2.push(
-    '0.98 0.96 0.93 rg',
-    '365 675 190 79 re f',
-    '0.88 0.75 0.60 RG',
-    '365 675 190 79 re S',
+    '0.92 0.92 0.92 rg',
+    '40 736 305 16 re f',
+    '0.82 0.82 0.82 RG',
+    '0.8 w',
+    '40 736 305 16 re S',
 
     'BT',
-    '/F1 8 Tf',
-    '0.4 0.4 0.4 rg',
-    '375 738 Td',
-    `(${pdfEscapeText(`Servicos: ${formatCurrency(servicesSubtotal)}`)}) Tj`,
-    '375 724 Td',
-    `(${pdfEscapeText(`Equipamentos: ${formatCurrency(equipmentsSubtotal)}`)}) Tj`,
-    '375 710 Td',
-    `(${pdfEscapeText(`Despesas/Logistica: ${formatCurrency(expensesSubtotal)}`)}) Tj`,
+    '/F2 7.5 Tf',
+    '0.20 0.20 0.20 rg',
+    '46 740 Td',
+    '(PARCELA / DESCRICAO) Tj',
+    '165 740 Td',
+    '(VENCIMENTO) Tj',
+    '230 740 Td',
+    '(MEIO) Tj',
+    '305 740 Td',
+    '(VALOR) Tj',
+    'ET',
+  )
+
+  let schedY = 720
+  const maxSchedItems = Math.min(schedule.length, 4)
+
+  if (schedule.length === 0) {
+    // Linha única padrão se não houver calendário configurado
+    streamPage2.push(
+      '0.90 0.90 0.90 RG',
+      '0.5 w',
+      `40 ${schedY - 4} m 345 ${schedY - 4} l S`,
+      'BT',
+      '/F1 7.5 Tf',
+      '0.20 0.20 0.20 rg',
+      `46 ${schedY} Td`,
+      '(A combinar na aprovacao) Tj',
+      `165 ${schedY} Td`,
+      `(${emissionDate}) Tj`,
+      `230 ${schedY} Td`,
+      '(PIX) Tj',
+      '/F2 7.5 Tf',
+      `295 ${schedY} Td`,
+      `(${pdfEscapeText(formatCurrency(grandTotal))}) Tj`,
+      'ET',
+    )
+    schedY -= 20
+  } else {
+    for (let s = 0; s < maxSchedItems; s++) {
+      const sc = schedule[s]
+      // Envolve descrição para não truncar
+      const descLines = wrapText(sc.description || `Parcela ${s + 1}`, 115, 7.5, false).slice(0, 2)
+      const rowH = descLines.length > 1 ? 22 : 16
+
+      streamPage2.push(
+        '0.92 0.92 0.92 RG',
+        '0.5 w',
+        `40 ${schedY - (rowH - 12)} m 345 ${schedY - (rowH - 12)} l S`,
+      )
+
+      // Descrição
+      streamPage2.push(
+        'BT',
+        '/F1 7.5 Tf',
+        '0.20 0.20 0.20 rg',
+        `46 ${schedY} Td`,
+        `(${pdfEscapeText(descLines[0])}) Tj`,
+      )
+      if (descLines[1]) {
+        streamPage2.push(`46 ${schedY - 9} Td`, `(${pdfEscapeText(descLines[1])}) Tj`)
+      }
+      streamPage2.push('ET')
+
+      // Vencimento, Meio e Valor formatado alinhado
+      const valStr = formatCurrency(sc.value)
+      const valX = 340 - estimateTextWidth(valStr, 7.5, true)
+      const dueDateStr = sc.dueDate ? formatShortDate(sc.dueDate) : 'Na aprovacao'
+
+      streamPage2.push(
+        'BT',
+        '/F1 7.5 Tf',
+        '0.25 0.25 0.25 rg',
+        `165 ${schedY} Td`,
+        `(${pdfEscapeText(dueDateStr)}) Tj`,
+        `230 ${schedY} Td`,
+        `(${pdfEscapeText(sc.method || 'PIX')}) Tj`,
+        '/F2 7.5 Tf',
+        '0.15 0.15 0.15 rg',
+        `${valX} ${schedY} Td`,
+        `(${pdfEscapeText(valStr)}) Tj`,
+        'ET',
+      )
+
+      schedY -= rowH
+    }
+  }
+
+  // CAIXA DE TOTAIS E RESUMO CONSOLIDADO (Lado Direito: X 355 a 555 = 200 pt de largura)
+  // Alinhada com a tabela de calendário
+  const summaryBoxY = 648
+  const summaryBoxHeight = 104
+  streamPage2.push(
+    '0.98 0.96 0.93 rg',
+    `355 ${summaryBoxY} 200 ${summaryBoxHeight} re f`,
+    '0.88 0.75 0.60 RG',
+    '0.8 w',
+    `355 ${summaryBoxY} 200 ${summaryBoxHeight} re S`,
+
+    // Título do box
+    'BT',
+    '/F2 8 Tf',
+    '0.50 0.25 0.05 rg',
+    '365 738 Td',
+    '(RESUMO FINANCEIRO) Tj',
     'ET',
 
-    '0.80 0.50 0.30 RG',
-    '375 700 m 545 700 l S',
+    // Linhas de detalhe
+    'BT',
+    '/F1 7.5 Tf',
+    '0.35 0.35 0.35 rg',
+    '365 722 Td',
+    `(${pdfEscapeText(`Servicos: ${formatCurrency(servicesSubtotal)}`)}) Tj`,
+    '365 709 Td',
+    `(${pdfEscapeText(`Equipamentos: ${formatCurrency(equipmentsSubtotal)}`)}) Tj`,
+    '365 696 Td',
+    `(${pdfEscapeText(`Despesas/Logistica: ${formatCurrency(expensesSubtotal)}`)}) Tj`,
+    'ET',
+  )
 
+  if (discounts > 0) {
+    streamPage2.push(
+      'BT',
+      '/F1 7.5 Tf',
+      '0.75 0.20 0.10 rg',
+      '365 683 Td',
+      `(${pdfEscapeText(`Desconto Comercial: -${formatCurrency(discounts)}`)}) Tj`,
+      'ET',
+    )
+  }
+
+  // Linha separadora do total
+  streamPage2.push(
+    '0.80 0.50 0.30 RG',
+    '0.8 w',
+    '365 677 m 545 677 l S',
+
+    // Destaque do TOTAL GERAL
     'BT',
     '/F2 11 Tf',
     '0.47 0.21 0.04 rg',
-    '375 684 Td',
+    '365 660 Td',
     `(${pdfEscapeText(`TOTAL: ${formatCurrency(grandTotal)}`)}) Tj`,
     'ET',
+  )
 
-    // Observações legais sobre pré-contrato e assinatura GOV.BR
-    '0.96 0.96 0.96 rg',
-    '40 605 515 54 re f',
-    '0.85 0.85 0.85 RG',
-    '40 605 515 54 re S',
+  // 6. DISPOSIÇÕES GERAIS & INSTRUÇÕES DE ASSINATURA ELETRÔNICA GOV.BR
+  // Problema 5 & 6 resolvidos: posicionamento Y explícito (sem sobreposição com a tabela acima)
+  // A tabela do calendário e o box de totais terminam por volta de Y=645.
+  // Colocamos o box de Disposições em Y=570 com altura 64 pt (de 570 a 634), deixando folga segura.
+  const dispBoxY = 572
+  const dispBoxHeight = 62
+  streamPage2.push(
+    '0.96 0.96 0.97 rg',
+    `40 ${dispBoxY} 515 ${dispBoxHeight} re f`,
+    '0.84 0.84 0.88 RG',
+    '0.8 w',
+    `40 ${dispBoxY} 515 ${dispBoxHeight} re S`,
 
+    // Título das Disposições Gerais
     'BT',
-    '/F2 8.5 Tf',
-    '0.3 0.3 0.3 rg',
-    '48 644 Td',
+    '/F2 8 Tf',
+    '0.30 0.30 0.35 rg',
+    `48 ${dispBoxY + 48} Td`,
     '(DISPOSICOES GERAIS & INSTRUCOES DE ASSINATURA ELETRONICA:) Tj',
     'ET',
+
+    // Textos informativos instruindo sobre o GOV.BR de ponta a ponta sem cortes
+    'BT',
+    '/F1 7.5 Tf',
+    '0.30 0.30 0.30 rg',
+    `48 ${dispBoxY + 35} Td`,
+    '(1. Documento preparado para assinatura eletronica oficial nos termos da Lei Federal 14.063/2020.) Tj',
+    `48 ${dispBoxY + 23} Td`,
+    '(2. Para assinar: acesse assinador.iti.br com sua conta GOV.BR (nivel prata ou ouro) e posicione o carimbo na area abaixo.) Tj',
+    `48 ${dispBoxY + 11} Td`,
+    '(3. A validade juridica e autenticidade poderao ser verificadas publicamente a qualquer momento em validar.iti.gov.br.) Tj',
+    'ET',
+  )
+
+  // 7. SEÇÃO DE ASSINATURAS ELETRÔNICAS GOV.BR
+  // Requisito GOV.BR / ITI: 2 áreas livres de carimbo (mínimo ~3.5 a 4 cm de altura livre).
+  // Altura disponível: de Y=70 até Y=560 = 490 pt!
+  // Distribuímos confortavelmente:
+  // - Título "ASSINATURAS ELETRÔNICAS": Y=554
+  // - Área 1 (Contratante): Y=424 a Y=544 (altura 120 pt = 4.23 cm)
+  // - Área 2 (Contratado): Y=290 a Y=410 (altura 120 pt = 4.23 cm)
+  // - Texto explicativo / nota de rodapé: Y=264 a 240
+  // - Espaço livre harmonioso e sem sobreposição até o rodapé oficial da página (Y=45).
+  streamPage2.push(
+    'BT',
+    '/F2 9.5 Tf',
+    '0.47 0.21 0.04 rg',
+    '40 552 Td',
+    '(6. ASSINATURAS ELETRONICAS - CONTRATANTE & CONTRATADO) Tj',
+    'ET',
+  )
+
+  // --- ÁREA 1: CONTRATANTE (CLIENTE) ---
+  // Caixa com 120 pt (~4.23 cm livres)
+  const box1Y = 422
+  const boxHeightSig = 118
+  streamPage2.push(
+    '0.99 0.99 0.99 rg',
+    `40 ${box1Y} 515 ${boxHeightSig} re f`,
+    '0.75 0.75 0.75 RG',
+    '0.8 w',
+    `40 ${box1Y} 515 ${boxHeightSig} re S`,
+
+    // Identificador no topo da caixa (discreto)
+    'BT',
+    '/F2 8 Tf',
+    '0.30 0.30 0.30 rg',
+    `48 ${box1Y + 104} Td`,
+    '([ Area livre para posicionamento do carimbo eletronico do CONTRATANTE / CLIENTE via GOV.BR ]) Tj',
+    'ET',
+
+    // Dados na base da caixa
     'BT',
     '/F1 7.5 Tf',
     '0.35 0.35 0.35 rg',
-    '48 630 Td',
-    '(1. Documento preparado para assinatura eletronica oficial via GOV.BR nos termos da Lei 14.063/2020.) Tj',
-    '48 618 Td',
-    '(2. Apos conferir os dados, acesse assinador.iti.br com sua conta prata ou ouro e posicione o carimbo na area abaixo.) Tj',
-    '48 607 Td',
-    '(3. A autenticidade podera ser verificada publicamente a qualquer momento em validar.iti.gov.br.) Tj',
-    'ET',
-
-    // =========================================================================
-    // SEÇÃO DE ASSINATURAS ELETRÔNICAS GOV.BR
-    // REQUISITO CRÍTICO: 2 áreas em branco com altura mínima aproximada de 4 cm (113 pt)
-    // cada, SEM textos ou linhas atravessando a região de carimbo.
-    // =========================================================================
-    'BT',
-    '/F2 10 Tf',
-    '0.47 0.21 0.04 rg',
-    '40 584 Td',
-    '(ASSINATURAS ELETRONICAS) Tj',
-    'ET',
-
-    // --- ÁREA 1: CONTRATANTE (CLIENTE) ---
-    // Altura: 115 pt (~4.05 cm). Caixa com borda discreta, interior completamente livre.
-    '0.75 0.75 0.75 RG',
-    '0.8 w',
-    '40 445 515 125 re S',
-
-    'BT',
-    '/F2 8.5 Tf',
-    '0.25 0.25 0.25 rg',
-    '48 554 Td',
-    '([ Area livre para assinatura eletronica do CONTRATANTE via GOV.BR ]) Tj',
-    'ET',
-
-    // Rótulos informativos na base da área
-    'BT',
-    '/F1 8 Tf',
-    '0.35 0.35 0.35 rg',
-    '48 472 Td',
-    `(${pdfEscapeText(`Nome/Razao social: ${client?.name || 'Cliente'}`)}) Tj`,
-    '48 460 Td',
+    `48 ${box1Y + 32} Td`,
+    `(${pdfEscapeText(`Nome/Razao Social: ${client?.name || 'Cliente'}`)}) Tj`,
+    `48 ${box1Y + 20} Td`,
     `(${pdfEscapeText(`CPF/CNPJ: ${client?.document || '_________________________'}`)}) Tj`,
-    '48 448 Td',
-    '(Data: _____ / _____ / _________) Tj',
+    `48 ${box1Y + 8} Td`,
+    '(Data da Assinatura: _____ / _____ / _________) Tj',
     'ET',
+  )
 
-    // --- ÁREA 2: CONTRATADO (PRESTADOR) ---
-    // Altura: 115 pt (~4.05 cm). Caixa com borda discreta, interior completamente livre.
+  // --- ÁREA 2: CONTRATADO (PRESTADOR) ---
+  // Caixa com 118 pt (~4.16 cm livres)
+  const box2Y = 286
+  streamPage2.push(
+    '0.99 0.99 0.99 rg',
+    `40 ${box2Y} 515 ${boxHeightSig} re f`,
     '0.75 0.75 0.75 RG',
     '0.8 w',
-    '40 300 515 125 re S',
+    `40 ${box2Y} 515 ${boxHeightSig} re S`,
 
+    // Identificador no topo da caixa (discreto)
     'BT',
-    '/F2 8.5 Tf',
-    '0.25 0.25 0.25 rg',
-    '48 409 Td',
-    '([ Area livre para assinatura eletronica do CONTRATADO via GOV.BR ]) Tj',
+    '/F2 8 Tf',
+    '0.30 0.30 0.30 rg',
+    `48 ${box2Y + 104} Td`,
+    '([ Area livre para posicionamento do carimbo eletronico do CONTRATADO / PRESTADOR via GOV.BR ]) Tj',
     'ET',
 
-    // Rótulos informativos na base da área
+    // Dados na base da caixa
     'BT',
-    '/F1 8 Tf',
+    '/F1 7.5 Tf',
     '0.35 0.35 0.35 rg',
-    '48 327 Td',
-    `(${pdfEscapeText(`Nome/Razao social: ${user?.name || 'Studio Freela'}`)}) Tj`,
-    '48 315 Td',
-    `(${pdfEscapeText(`CPF/CNPJ: ${user?.cpfCnpj || user?.phone || '_________________________'}`)}) Tj`,
-    '48 303 Td',
-    '(Data: _____ / _____ / _________) Tj',
+    `48 ${box2Y + 32} Td`,
+    `(${pdfEscapeText(`Nome/Razao Social: ${user?.name || 'Studio Freela'}`)}) Tj`,
+    `48 ${box2Y + 20} Td`,
+    `(${pdfEscapeText(`CPF/CNPJ: ${user?.cpfCnpj || '_________________________'}`)}) Tj`,
+    `48 ${box2Y + 8} Td`,
+    '(Data da Assinatura: _____ / _____ / _________) Tj',
     'ET',
+  )
 
-    // Nota final obrigatória conforme especificação
+  // 8. TEXTO EXPLICATIVO APÓS AS ASSINATURAS (Problema 7 resolvido: sem fragmentação/corte)
+  streamPage2.push(
     'BT',
     '/F1 7 Tf',
     '0.45 0.45 0.45 rg',
-    '40 270 Td',
-    '(Documento preparado para assinatura eletronica. Apos conferir os dados, faca o download do PDF e utilize) Tj',
-    '40 260 Td',
-    '(o servico oficial de Assinatura Eletronica GOV.BR. A autenticidade do arquivo assinado podera ser verificada no VALIDAR.) Tj',
+    '40 262 Td',
+    '(Nota Legal: Este documento foi emitido e formatado digitalmente para aceite comercial e assinatura eletronica.) Tj',
+    '40 252 Td',
+    '(Apos a conferencia dos dados pelo Contratante e Contratado, utilize o servico oficial de Assinatura Eletronica do GOV.BR.) Tj',
+    '40 242 Td',
+    '(A integridade e o nao-repudio deste arquivo apos assinado podem ser atestados publicamente no portal oficial VALIDAR do ITI.) Tj',
     'ET',
+  )
 
-    // Rodapé da Página 2
+  // Rodapé da Página 2
+  streamPage2.push(
     '0.85 0.85 0.85 RG',
+    '0.8 w',
     '40 45 m 555 45 l S',
     'BT',
     '/F1 7.5 Tf',
-    '0.5 0.5 0.5 rg',
-    '40 34 Td',
-    `(${pdfEscapeText(`Studio Freela (studiofreela.com) • Proposta Comercial #${quote.number || 'ORC'} • Pagina 2 de 2 • Preparado para GOV.BR`)}) Tj`,
+    '0.50 0.50 0.50 rg',
+    '40 33 Td',
+    `(${pdfEscapeText(`Studio Freela (studiofreela.com) • Proposta Comercial #${quote.number || 'ORC'} • Pagina 2 de 2 • Preparado para GOV.BR / ITI`)}) Tj`,
     'ET',
     'Q',
   )
 
-  // Montagem do PDF em sintaxe canônica PDF-1.4
+  // Montagem canônica do PDF em sintaxe PDF-1.4
   const page1Content = streamPage1.join('\n')
   const page2Content = streamPage2.join('\n')
 
