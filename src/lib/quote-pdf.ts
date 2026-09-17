@@ -152,6 +152,10 @@ export function buildQuoteBinaryPdfBlob(
     '0.35 0.35 0.35 rg',
     '40 773 Td',
     `(${pdfEscapeText(user?.profession || 'Prestacao de Servicos Especializados')}) Tj`,
+    'ET',
+    'BT',
+    '/F1 8.5 Tf',
+    '0.35 0.35 0.35 rg',
     '40 762 Td',
     `(${pdfEscapeText([user?.email, user?.phone, user?.cpfCnpj ? `Doc: ${user.cpfCnpj}` : ''].filter(Boolean).join(' • '))}) Tj`,
     'ET',
@@ -209,6 +213,10 @@ export function buildQuoteBinaryPdfBlob(
     '0.35 0.35 0.35 rg',
     '50 703 Td',
     `(${pdfEscapeText(user?.profession || 'Prestador Autonomo')}) Tj`,
+    'ET',
+    'BT',
+    '/F1 8 Tf',
+    '0.35 0.35 0.35 rg',
     '50 691 Td',
     `(${pdfEscapeText([user?.email, user?.phone].filter(Boolean).join(' • '))}) Tj`,
     'ET',
@@ -231,6 +239,10 @@ export function buildQuoteBinaryPdfBlob(
     '0.35 0.35 0.35 rg',
     '310 703 Td',
     `(${pdfEscapeText(`Doc: ${client?.document || 'N/I'} • Tel: ${client?.phone || 'N/I'}`)}) Tj`,
+    'ET',
+    'BT',
+    '/F1 8 Tf',
+    '0.35 0.35 0.35 rg',
     '310 691 Td',
     `(${pdfEscapeText(client?.email ? `Email: ${client.email}` : client?.tradeName ? `Fantasia: ${client.tradeName}` : 'Conforme cadastro comercial')}) Tj`,
     'ET',
@@ -262,6 +274,10 @@ export function buildQuoteBinaryPdfBlob(
     '0.30 0.30 0.30 rg',
     '50 632 Td',
     `(${pdfEscapeText(`Periodo: ${quote.eventStartDate ? formatShortDate(quote.eventStartDate) : emissionDate} as ${quote.eventStartTime || '09:00'} ate ${quote.eventEndDate ? formatShortDate(quote.eventEndDate) : emissionDate} as ${quote.eventEndTime || '18:00'}`)}) Tj`,
+    'ET',
+    'BT',
+    '/F1 8 Tf',
+    '0.30 0.30 0.30 rg',
     '50 622 Td',
     `(${pdfEscapeText(`Local de Execucao: ${quote.eventLocation || 'A definir / Conforme alinhamento previo com o cliente'}`)}) Tj`,
     'ET',
@@ -295,13 +311,29 @@ export function buildQuoteBinaryPdfBlob(
     '0.20 0.20 0.20 rg',
     '46 580 Td',
     '(DESCRICAO DO SERVICO) Tj',
-    '340 580 Td',
+    'ET',
+    'BT',
+    '/F2 8 Tf',
+    '0.20 0.20 0.20 rg',
+    '330 580 Td',
     '(QTD) Tj',
-    '380 580 Td',
+    'ET',
+    'BT',
+    '/F2 8 Tf',
+    '0.20 0.20 0.20 rg',
+    '365 580 Td',
     '(UN.) Tj',
-    '430 580 Td',
+    'ET',
+    'BT',
+    '/F2 8 Tf',
+    '0.20 0.20 0.20 rg',
+    '432 580 Td',
     '(UNITARIO) Tj',
-    '510 580 Td',
+    'ET',
+    'BT',
+    '/F2 8 Tf',
+    '0.20 0.20 0.20 rg',
+    '518 580 Td',
     '(TOTAL) Tj',
     'ET',
   )
@@ -343,24 +375,40 @@ export function buildQuoteBinaryPdfBlob(
     }
     streamPage1.push('ET')
 
-    // Quantidade, Unidade, Unitário e Total alinhados
+    // Quantidade, Unidade, Unitário e Total alinhados com blocos BT...ET isolados
     const unitPriceStr = formatCurrency(unitPrice)
     const itemTotalStr = formatCurrency(itemTotal)
 
-    // Ajusta coordenadas X para ficarem alinhadas à direita dentro da respectiva coluna
-    const unitPriceX = 478 - estimateTextWidth(unitPriceStr, 8, false)
+    // Ajusta coordenadas X para ficarem perfeitamente alinhadas à direita dentro da respectiva coluna
+    const unitPriceX = 472 - estimateTextWidth(unitPriceStr, 8, false)
     const itemTotalX = 550 - estimateTextWidth(itemTotalStr, 8, true)
 
+    // Quantidade (coluna 325 a 355)
+    streamPage1.push('BT', '/F1 8 Tf', '0.20 0.20 0.20 rg', `335 ${curY} Td`, `(${qty}) Tj`, 'ET')
+
+    // Unidade (coluna 358 a 395)
     streamPage1.push(
       'BT',
       '/F1 8 Tf',
       '0.20 0.20 0.20 rg',
-      `345 ${curY} Td`,
-      `(${qty}) Tj`,
-      `382 ${curY} Td`,
+      `366 ${curY} Td`,
       `(${pdfEscapeText((it.unit || 'sv').slice(0, 8))}) Tj`,
+      'ET',
+    )
+
+    // Unitário alinhado à direita em 472 (coluna 398 a 472)
+    streamPage1.push(
+      'BT',
+      '/F1 8 Tf',
+      '0.20 0.20 0.20 rg',
       `${unitPriceX} ${curY} Td`,
       `(${pdfEscapeText(unitPriceStr)}) Tj`,
+      'ET',
+    )
+
+    // Total alinhado à direita em 550 (coluna 475 a 550)
+    streamPage1.push(
+      'BT',
       '/F2 8 Tf',
       '0.15 0.15 0.15 rg',
       `${itemTotalX} ${curY} Td`,
@@ -407,11 +455,23 @@ export function buildQuoteBinaryPdfBlob(
       '0.20 0.20 0.20 rg',
       `46 ${curY + 4} Td`,
       '(ITEM / EQUIPAMENTO) Tj',
-      `340 ${curY + 4} Td`,
+      'ET',
+      'BT',
+      '/F2 7.5 Tf',
+      '0.20 0.20 0.20 rg',
+      `335 ${curY + 4} Td`,
       '(QTD) Tj',
-      `420 ${curY + 4} Td`,
+      'ET',
+      'BT',
+      '/F2 7.5 Tf',
+      '0.20 0.20 0.20 rg',
+      `415 ${curY + 4} Td`,
       '(STATUS / VALOR) Tj',
-      `510 ${curY + 4} Td`,
+      'ET',
+      'BT',
+      '/F2 7.5 Tf',
+      '0.20 0.20 0.20 rg',
+      `515 ${curY + 4} Td`,
       '(TOTAL) Tj',
       'ET',
     )
@@ -436,10 +496,20 @@ export function buildQuoteBinaryPdfBlob(
         '0.20 0.20 0.20 rg',
         `46 ${curY + 1} Td`,
         `(${pdfEscapeText(eq.description.slice(0, 50))}) Tj`,
-        `345 ${curY + 1} Td`,
+        'ET',
+        'BT',
+        '/F1 7.5 Tf',
+        '0.20 0.20 0.20 rg',
+        `340 ${curY + 1} Td`,
         `(${eqQty}) Tj`,
+        'ET',
+        'BT',
+        '/F1 7.5 Tf',
+        '0.20 0.20 0.20 rg',
         `410 ${curY + 1} Td`,
         `(${pdfEscapeText(eqStatusStr)}) Tj`,
+        'ET',
+        'BT',
         '/F2 7.5 Tf',
         eq.includedInService ? '0.20 0.55 0.25 rg' : '0.15 0.15 0.15 rg',
         `${eqTotalX} ${curY + 1} Td`,
@@ -504,10 +574,22 @@ export function buildQuoteBinaryPdfBlob(
     '0.25 0.25 0.25 rg',
     `50 ${curY + 54} Td`,
     `(${pdfEscapeText(`• ${overtimeText}`)}) Tj`,
+    'ET',
+    'BT',
+    '/F1 7.5 Tf',
+    '0.25 0.25 0.25 rg',
     `50 ${curY + 41} Td`,
     `(${pdfEscapeText(`• ${mealText}`)}) Tj`,
+    'ET',
+    'BT',
+    '/F1 7.5 Tf',
+    '0.25 0.25 0.25 rg',
     `50 ${curY + 28} Td`,
     `(${pdfEscapeText(`• ${transportText}`)}) Tj`,
+    'ET',
+    'BT',
+    '/F1 7.5 Tf',
+    '0.25 0.25 0.25 rg',
     `50 ${curY + 15} Td`,
     `(${pdfEscapeText(`• ${lodgingText}`)}) Tj`,
     'ET',
@@ -553,35 +635,48 @@ export function buildQuoteBinaryPdfBlob(
     // Título da Seção Financeira
     'BT',
     '/F2 9.5 Tf',
-    '0.20 0.20 0.20 rg',
+    '0.47 0.21 0.04 rg',
     '40 758 Td',
     '(5. CALENDARIO DE PAGAMENTO & RESUMO CONSOLIDADO) Tj',
     'ET',
   ]
 
   // TABELA DO CALENDÁRIO (Lado Esquerdo: X 40 a 345 = 305 pt de largura)
-  // Colunas do calendário:
-  // - Parcela/Descrição: 40 a 160 (120 pt) - quebra em 2 linhas se necessário
-  // - Vencimento: 160 a 225 (65 pt)
-  // - Meio: 225 a 275 (50 pt)
-  // - Valor: 275 a 345 (70 pt, alinhado à direita em 340)
+  // Distribuição de colunas calibradas:
+  // - Parcela/Descrição: 40 a 160 (largura 120 pt) - quebra fluida em 2 linhas
+  // - Vencimento: 160 a 225 (largura 65 pt, texto em 165)
+  // - Meio de Pagamento: 225 a 275 (largura 50 pt, texto em 228)
+  // - Valor da Parcela: 275 a 345 (largura 70 pt, alinhado à direita em 340)
   streamPage2.push(
-    '0.92 0.92 0.92 rg',
+    '0.91 0.91 0.91 rg',
     '40 736 305 16 re f',
-    '0.82 0.82 0.82 RG',
+    '0.80 0.80 0.80 RG',
     '0.8 w',
     '40 736 305 16 re S',
 
+    // Cabeçalhos isolados em blocos BT...ET para evitar acumulação de deslocamento
     'BT',
     '/F2 7.5 Tf',
     '0.20 0.20 0.20 rg',
     '46 740 Td',
     '(PARCELA / DESCRICAO) Tj',
+    'ET',
+    'BT',
+    '/F2 7.5 Tf',
+    '0.20 0.20 0.20 rg',
     '165 740 Td',
     '(VENCIMENTO) Tj',
-    '230 740 Td',
+    'ET',
+    'BT',
+    '/F2 7.5 Tf',
+    '0.20 0.20 0.20 rg',
+    '228 740 Td',
     '(MEIO) Tj',
-    '305 740 Td',
+    'ET',
+    'BT',
+    '/F2 7.5 Tf',
+    '0.20 0.20 0.20 rg',
+    '306 740 Td',
     '(VALOR) Tj',
     'ET',
   )
@@ -591,6 +686,8 @@ export function buildQuoteBinaryPdfBlob(
 
   if (schedule.length === 0) {
     // Linha única padrão se não houver calendário configurado
+    const defaultValStr = formatCurrency(grandTotal)
+    const defaultValX = 340 - estimateTextWidth(defaultValStr, 7.5, true)
     streamPage2.push(
       '0.90 0.90 0.90 RG',
       '0.5 w',
@@ -600,13 +697,24 @@ export function buildQuoteBinaryPdfBlob(
       '0.20 0.20 0.20 rg',
       `46 ${schedY} Td`,
       '(A combinar na aprovacao) Tj',
+      'ET',
+      'BT',
+      '/F1 7.5 Tf',
+      '0.25 0.25 0.25 rg',
       `165 ${schedY} Td`,
       `(${emissionDate}) Tj`,
-      `230 ${schedY} Td`,
+      'ET',
+      'BT',
+      '/F1 7.5 Tf',
+      '0.25 0.25 0.25 rg',
+      `228 ${schedY} Td`,
       '(PIX) Tj',
+      'ET',
+      'BT',
       '/F2 7.5 Tf',
-      `295 ${schedY} Td`,
-      `(${pdfEscapeText(formatCurrency(grandTotal))}) Tj`,
+      '0.15 0.15 0.15 rg',
+      `${defaultValX} ${schedY} Td`,
+      `(${pdfEscapeText(defaultValStr)}) Tj`,
       'ET',
     )
     schedY -= 20
@@ -630,25 +738,42 @@ export function buildQuoteBinaryPdfBlob(
         '0.20 0.20 0.20 rg',
         `46 ${schedY} Td`,
         `(${pdfEscapeText(descLines[0])}) Tj`,
+        'ET',
       )
       if (descLines[1]) {
-        streamPage2.push(`46 ${schedY - 9} Td`, `(${pdfEscapeText(descLines[1])}) Tj`)
+        streamPage2.push(
+          'BT',
+          '/F1 7.5 Tf',
+          '0.20 0.20 0.20 rg',
+          `46 ${schedY - 9} Td`,
+          `(${pdfEscapeText(descLines[1])}) Tj`,
+          'ET',
+        )
       }
-      streamPage2.push('ET')
 
-      // Vencimento, Meio e Valor formatado alinhado
-      const valStr = formatCurrency(sc.value)
+      // Vencimento, Meio de Pagamento e Valor em blocos BT...ET isolados
+      const valStr = formatCurrency(Number(sc.value) || 0)
       const valX = 340 - estimateTextWidth(valStr, 7.5, true)
       const dueDateStr = sc.dueDate ? formatShortDate(sc.dueDate) : 'Na aprovacao'
+      const methodStr = sc.method ? String(sc.method) : 'PIX'
 
       streamPage2.push(
+        // Vencimento
         'BT',
         '/F1 7.5 Tf',
         '0.25 0.25 0.25 rg',
         `165 ${schedY} Td`,
         `(${pdfEscapeText(dueDateStr)}) Tj`,
-        `230 ${schedY} Td`,
-        `(${pdfEscapeText(sc.method || 'PIX')}) Tj`,
+        'ET',
+        // Meio de pagamento
+        'BT',
+        '/F1 7.5 Tf',
+        '0.25 0.25 0.25 rg',
+        `228 ${schedY} Td`,
+        `(${pdfEscapeText(methodStr)}) Tj`,
+        'ET',
+        // Valor da parcela alinhado à direita
+        'BT',
         '/F2 7.5 Tf',
         '0.15 0.15 0.15 rg',
         `${valX} ${schedY} Td`,
@@ -661,33 +786,62 @@ export function buildQuoteBinaryPdfBlob(
   }
 
   // CAIXA DE TOTAIS E RESUMO CONSOLIDADO (Lado Direito: X 355 a 555 = 200 pt de largura)
-  // Alinhada com a tabela de calendário
-  const summaryBoxY = 648
-  const summaryBoxHeight = 104
+  // Alinhada com a tabela de calendário, do topo Y=752 até Y=646 (altura = 106 pt).
+  // Distribuição vertical calibrada sem sobreposição:
+  // - Topo do box: 752
+  // - Cabeçalho do box (faixa colorida): Y=736 a 752 (altura 16 pt), texto em Y=741
+  // - Linha 1 (Serviços): Y=723
+  // - Linha 2 (Equipamentos): Y=710
+  // - Linha 3 (Despesas/Logística): Y=697
+  // - Linha 4 (Descontos se houver): Y=684
+  // - Linha divisória: Y=678
+  // - Total Geral: Y=660
+  const summaryBoxY = 646
+  const summaryBoxHeight = 106
   streamPage2.push(
-    '0.98 0.96 0.93 rg',
+    // Fundo do box
+    '0.98 0.97 0.95 rg',
     `355 ${summaryBoxY} 200 ${summaryBoxHeight} re f`,
-    '0.88 0.75 0.60 RG',
+    '0.85 0.78 0.70 RG',
     '0.8 w',
     `355 ${summaryBoxY} 200 ${summaryBoxHeight} re S`,
 
-    // Título do box
+    // Faixa de cabeçalho do box
+    '0.93 0.89 0.83 rg',
+    '355 736 200 16 re f',
+    '0.85 0.78 0.70 RG',
+    '0.5 w',
+    '355 736 m 555 736 l S',
+
+    // Título do box (dentro da faixa de cabeçalho Y=741)
     'BT',
     '/F2 8 Tf',
-    '0.50 0.25 0.05 rg',
-    '365 738 Td',
+    '0.47 0.21 0.04 rg',
+    '365 741 Td',
     '(RESUMO FINANCEIRO) Tj',
     'ET',
 
-    // Linhas de detalhe
+    // Linha 1: Serviços
     'BT',
     '/F1 7.5 Tf',
-    '0.35 0.35 0.35 rg',
-    '365 722 Td',
+    '0.30 0.30 0.30 rg',
+    '365 723 Td',
     `(${pdfEscapeText(`Servicos: ${formatCurrency(servicesSubtotal)}`)}) Tj`,
-    '365 709 Td',
+    'ET',
+
+    // Linha 2: Equipamentos
+    'BT',
+    '/F1 7.5 Tf',
+    '0.30 0.30 0.30 rg',
+    '365 710 Td',
     `(${pdfEscapeText(`Equipamentos: ${formatCurrency(equipmentsSubtotal)}`)}) Tj`,
-    '365 696 Td',
+    'ET',
+
+    // Linha 3: Despesas / Logística
+    'BT',
+    '/F1 7.5 Tf',
+    '0.30 0.30 0.30 rg',
+    '365 697 Td',
     `(${pdfEscapeText(`Despesas/Logistica: ${formatCurrency(expensesSubtotal)}`)}) Tj`,
     'ET',
   )
@@ -697,7 +851,7 @@ export function buildQuoteBinaryPdfBlob(
       'BT',
       '/F1 7.5 Tf',
       '0.75 0.20 0.10 rg',
-      '365 683 Td',
+      '365 684 Td',
       `(${pdfEscapeText(`Desconto Comercial: -${formatCurrency(discounts)}`)}) Tj`,
       'ET',
     )
@@ -707,7 +861,7 @@ export function buildQuoteBinaryPdfBlob(
   streamPage2.push(
     '0.80 0.50 0.30 RG',
     '0.8 w',
-    '365 677 m 545 677 l S',
+    '365 678 m 545 678 l S',
 
     // Destaque do TOTAL GERAL
     'BT',
