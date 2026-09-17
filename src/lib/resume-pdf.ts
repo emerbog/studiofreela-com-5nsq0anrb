@@ -633,6 +633,13 @@ export function downloadResumeBinaryPdf(
     document.body.removeChild(link)
     setTimeout(() => URL.revokeObjectURL(url), 2000)
     toast.success('Currículo em PDF baixado com sucesso!')
+
+    // Instrument usage event
+    import('@/services/adminService')
+      .then(({ adminService }) => {
+        adminService.logUsageEvent('resume_generated', { user_id: user?.id })
+      })
+      .catch(() => {})
   } catch (err: any) {
     console.error('Erro ao gerar PDF do currículo:', err)
     toast.error('Erro ao gerar arquivo PDF do currículo.')

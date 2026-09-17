@@ -79,8 +79,151 @@ export type UserProfile = {
   address?: string
   cpfCnpj?: string
   plan_tier?: PlanTier
+  is_blocked?: boolean
+  blocked_reason?: string
+  last_login_at?: string
   created?: string
   updated?: string
+}
+
+// -------------------------------------------------------------
+// ADMIN & GOVERNANÇA (Studio Freela Admin)
+// -------------------------------------------------------------
+
+export type AdminRole = 'admin' | 'financeiro' | 'suporte' | 'analista' | 'freelancer'
+
+export type AdminUserItem = {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  address?: string
+  profession?: string
+  plan_tier: PlanTier
+  is_blocked?: boolean
+  blocked_reason?: string
+  last_login_at?: string
+  created: string
+  updated: string
+  role: AdminRole
+  counts: {
+    clients: number
+    quotes: number
+    contracts: number
+    events: number
+    finances: number
+  }
+}
+
+export type AdminAuditLog = {
+  id: string
+  admin_user?: string
+  admin_email?: string
+  action: string
+  target_type?: string
+  target_id?: string
+  details?: Record<string, any>
+  ip_address?: string
+  created: string
+}
+
+export type UsageEvent = {
+  id: string
+  user: string
+  event_type:
+    | 'login'
+    | 'client_created'
+    | 'quote_created'
+    | 'quote_confirmed'
+    | 'pdf_generated'
+    | 'event_created'
+    | 'receivable_created'
+    | 'contract_generated'
+    | 'contract_sent'
+    | 'contract_signed'
+    | 'resume_generated'
+    | 'equipment_created'
+    | 'service_created'
+    | 'page_view'
+    | string
+  resource_id?: string
+  details?: Record<string, any>
+  ip_address?: string
+  created: string
+}
+
+export type SubscriptionItem = {
+  id: string
+  user: string
+  plan: PlanTier
+  status: 'active' | 'past_due' | 'canceled' | 'trialing' | 'incomplete'
+  price?: number
+  billing_interval?: 'monthly' | 'yearly'
+  current_period_start?: string
+  current_period_end?: string
+  cancel_at_period_end?: boolean
+  trial_end?: string
+  gateway_provider?: string
+  created: string
+}
+
+export type PaymentItem = {
+  id: string
+  user: string
+  amount: number
+  currency: string
+  status: 'succeeded' | 'pending' | 'failed' | 'refunded'
+  payment_method_type?: 'pix' | 'credit_card' | 'boleto' | 'other'
+  gateway_provider?: string
+  gateway_payment_id?: string
+  paid_at?: string
+  failure_reason?: string
+  created: string
+}
+
+export type SupportTicket = {
+  id: string
+  user: string
+  subject: string
+  description: string
+  status: 'aberto' | 'em_atendimento' | 'resolvido' | 'fechado'
+  priority?: 'baixa' | 'media' | 'alta' | 'urgente'
+  assigned_admin?: string
+  responses?: Array<{
+    sender_id: string
+    sender_email: string
+    sender_type: 'admin' | 'user'
+    message: string
+    created_at: string
+  }>
+  created: string
+  updated: string
+}
+
+export type AdminOverviewData = {
+  userRole: AdminRole
+  counts: {
+    totalUsers: number
+    totalClients: number
+    totalEvents: number
+    totalFinances: number
+    totalQuotes: number
+    confirmedQuotes: number
+    totalContracts: number
+    totalEquipments: number
+    totalServices: number
+    totalProfiles: number
+    totalSubscriptions: number
+    totalPayments: number
+    totalTickets: number
+    paidFinancesValue: number
+  }
+  users: AdminUserItem[]
+  auditLogs: AdminAuditLog[]
+  usageEvents: UsageEvent[]
+  subscriptions: SubscriptionItem[]
+  payments: PaymentItem[]
+  supportTickets: SupportTicket[]
 }
 
 // -------------------------------------------------------------

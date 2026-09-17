@@ -1092,6 +1092,13 @@ export function downloadQuoteBinaryPdf(quote: Quote, client?: Client, user?: Use
     document.body.removeChild(link)
     setTimeout(() => URL.revokeObjectURL(url), 2000)
     toast.success('PDF do orçamento gerado e baixado com sucesso!')
+
+    // Instrument usage event
+    import('@/services/adminService')
+      .then(({ adminService }) => {
+        adminService.logUsageEvent('pdf_generated', { type: 'quote', quote_id: quote.id })
+      })
+      .catch(() => {})
   } catch (err: any) {
     console.error('Erro ao gerar PDF binário:', err)
     toast.error('Erro ao gerar arquivo PDF.')

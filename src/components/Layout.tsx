@@ -224,8 +224,14 @@ export function Layout() {
                   <UserIcon className="w-4 h-4 mr-2" />
                   Meu Perfil & Senha
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate('/admin')}
+                  className="cursor-pointer text-emerald-600 font-medium"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2 text-emerald-600" />
+                  Painel Administrativo
+                </DropdownMenuItem>{' '}
                 <DropdownMenuSeparator />
-
                 <DropdownMenuItem
                   onClick={handleLogout}
                   className="cursor-pointer text-destructive focus:text-destructive"
@@ -313,6 +319,13 @@ export function Layout() {
                   <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
                     <UserIcon className="w-4 h-4 mr-2" />
                     Meu Perfil
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => navigate('/admin')}
+                    className="cursor-pointer text-emerald-600 font-medium"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2 text-emerald-600" />
+                    Painel Administrativo
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/')} className="cursor-pointer">
                     <ExternalLink className="w-4 h-4 mr-2" />
