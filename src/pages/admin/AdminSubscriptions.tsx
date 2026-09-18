@@ -11,6 +11,8 @@ import {
   Calendar,
   Layers,
   ArrowUpRight,
+  Download,
+  ExternalLink,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -23,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { toast } from '@/hooks/use-toast'
 
 export const AdminSubscriptions: React.FC = () => {
   const { overviewData } = useAdmin()
@@ -48,12 +51,75 @@ export const AdminSubscriptions: React.FC = () => {
       const matchSearch =
         name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.plan.toLowerCase().includes(searchTerm.toLowerCase())
+        s.plan.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.gateway_subscription_id &&
+          s.gateway_subscription_id.toLowerCase().includes(searchTerm.toLowerCase()))
 
       const matchStatus = statusFilter === 'all' || s.status === statusFilter
       return matchSearch && matchStatus
     })
   }, [subscriptions, userMap, searchTerm, statusFilter])
+
+  // Exportar CSV
+  const handleExportCsv = () => {
+    if (filtered.length === 0) {
+      toast({
+        title: 'Nenhum dado para exportar',
+        description: 'Não há assinaturas disponíveis para o filtro atual.',
+      })
+      return
+    }
+
+    const headers = [
+      'ID Assinatura',
+      'Assinante Nome',
+      'Assinante Email',
+      'Plano',
+      'Preço (BRL)',
+      'Status',
+      'Intervalo',
+      'Início Período',
+      'Fim Período / Próx Cobrança',
+      'Provedor',
+      'ID Gateway',
+      'Data Criação',
+    ]
+
+    const rows = filtered.map((s) => {
+      const u = userMap.get(s.user)
+      return [
+        `"${s.id}"`,
+        `"${(u?.name || s.user).replace(/"/g, '""')}"`,
+        `"${(u?.email || '').replace(/"/g, '""')}"`,
+        `"${s.plan}"`,
+        s.price || 0,
+        `"${s.status}"`,
+        `"${s.billing_interval || 'monthly'}"`,
+        `"${s.current_period_start || ''}"`,
+        `"${s.current_period_end || s.next_due_date || ''}"`,
+        `"${s.gateway_provider || 'asaas'}"`,
+        `"${s.gateway_subscription_id || ''}"`,
+        `"${s.created}"`,
+      ].join(',')
+    })
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n')
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement('a')
+    link.setAttribute('href', encodedUri)
+    link.setAttribute(
+      'download',
+      `studiofreela_assinaturas_${new Date().toISOString().slice(0, 10)}.csv`,
+    )
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast({
+      title: 'Exportação Concluída',
+      description: `${filtered.length} registro(s) exportado(s) com sucesso.`,
+    })
+  }
 
   // Stats
   const activeCount = subscriptions.filter((s) => s.status === 'active').length
@@ -63,13 +129,26 @@ export const AdminSubscriptions: React.FC = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold font-serif text-white tracking-tight">
-          Gestão de Assinaturas
-        </h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Acompanhamento de planos, períodos de teste, upgrades, renovações e cancelamentos.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold font-serif text-white tracking-tight">
+            Gestão de Assinaturas Asaas
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Acompanhamento em tempo real de planos, cobranças recorrentes, inadimplência e
+            cancelamentos.
+          </p>
+        </div>
+
+        <Button
+          onClick={handleExportCsv}
+          variant="outline"
+          size="sm"
+          className="bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 text-xs h-9 gap-1.5 self-start sm:self-auto"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Exportar CSV ({filtered.length})
+        </Button>
       </div>
 
       {/* KPI Cards */}
@@ -173,7 +252,8 @@ export const AdminSubscriptions: React.FC = () => {
                   <th className="py-3 px-4">Valor</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Próxima Cobrança</th>
-                  <th className="py-3 px-4">Provedor</th>
+                  <th className="py-3 px-4">Provedor & ID Gateway</th>
+                  <th className="py-3 px-4 text-right">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
@@ -199,17 +279,50 @@ export const AdminSubscriptions: React.FC = () => {
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                               : s.status === 'past_due'
                                 ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                                : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                                : s.status === 'incomplete'
+                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                                  : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
                           }
                         >
-                          {s.status}
+                          {s.status === 'active'
+                            ? 'Ativa'
+                            : s.status === 'past_due'
+                              ? 'Inadimplente / Vencida'
+                              : s.status === 'incomplete'
+                                ? 'Aguardando Pagamento'
+                                : s.status === 'canceled'
+                                  ? 'Cancelada'
+                                  : s.status}
                         </Badge>
                       </td>
                       <td className="py-3.5 px-4 text-slate-400">
-                        {s.current_period_end ? formatDate(s.current_period_end) : '—'}
+                        {s.current_period_end
+                          ? formatDate(s.current_period_end)
+                          : s.next_due_date
+                            ? formatDate(s.next_due_date)
+                            : '—'}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-500">
-                        {s.gateway_provider || 'Interno'}
+                      <td className="py-3.5 px-4">
+                        <div className="text-slate-300 font-medium uppercase text-[10px]">
+                          {s.gateway_provider || 'Asaas'}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono truncate max-w-[120px]">
+                          {s.gateway_subscription_id || '—'}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        {s.checkout_url && (
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-[11px] gap-1 text-slate-300 hover:text-white"
+                          >
+                            <a href={s.checkout_url} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="w-3 h-3" /> Fatura
+                            </a>
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   )

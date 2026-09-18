@@ -160,7 +160,7 @@ routerAdd(
     // Subscriptions & Payments
     const subscriptionsList = []
     try {
-      const rawSubs = $app.findRecordsByFilter('subscriptions', '', '-created', 50, 0)
+      const rawSubs = $app.findRecordsByFilter('subscriptions', '', '-created', 100, 0)
       for (let i = 0; i < rawSubs.length; i++) {
         const s = rawSubs[i]
         subscriptionsList.push({
@@ -173,8 +173,14 @@ routerAdd(
           current_period_start: s.getString('current_period_start'),
           current_period_end: s.getString('current_period_end'),
           cancel_at_period_end: s.getBool('cancel_at_period_end'),
+          canceled_at: s.getString('canceled_at'),
           trial_end: s.getString('trial_end'),
           gateway_provider: s.getString('gateway_provider'),
+          gateway_customer_id: s.getString('gateway_customer_id'),
+          gateway_subscription_id: s.getString('gateway_subscription_id'),
+          checkout_url: s.getString('checkout_url'),
+          billing_type: s.getString('billing_type'),
+          next_due_date: s.getString('next_due_date'),
           created: s.getString('created'),
         })
       }
@@ -182,7 +188,7 @@ routerAdd(
 
     const paymentsList = []
     try {
-      const rawPays = $app.findRecordsByFilter('payments', '', '-created', 50, 0)
+      const rawPays = $app.findRecordsByFilter('payments', '', '-created', 100, 0)
       for (let i = 0; i < rawPays.length; i++) {
         const p = rawPays[i]
         paymentsList.push({
@@ -194,7 +200,11 @@ routerAdd(
           payment_method_type: p.getString('payment_method_type'),
           gateway_provider: p.getString('gateway_provider'),
           gateway_payment_id: p.getString('gateway_payment_id'),
+          gateway_subscription_id: p.getString('gateway_subscription_id'),
+          invoice_url: p.getString('invoice_url'),
+          bank_slip_url: p.getString('bank_slip_url'),
           paid_at: p.getString('paid_at'),
+          due_date: p.getString('due_date'),
           failure_reason: p.getString('failure_reason'),
           created: p.getString('created'),
         })

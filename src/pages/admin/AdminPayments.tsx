@@ -11,8 +11,11 @@ import {
   CreditCard,
   QrCode,
   FileCheck,
+  Download,
+  ExternalLink,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -22,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { toast } from '@/hooks/use-toast'
 
 export const AdminPayments: React.FC = () => {
   const { overviewData } = useAdmin()
@@ -46,12 +50,73 @@ export const AdminPayments: React.FC = () => {
         name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (p.gateway_payment_id &&
-          p.gateway_payment_id.toLowerCase().includes(searchTerm.toLowerCase()))
+          p.gateway_payment_id.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (p.gateway_subscription_id &&
+          p.gateway_subscription_id.toLowerCase().includes(searchTerm.toLowerCase()))
 
       const matchStatus = statusFilter === 'all' || p.status === statusFilter
       return matchSearch && matchStatus
     })
   }, [payments, userMap, searchTerm, statusFilter])
+
+  // Exportar CSV
+  const handleExportCsv = () => {
+    if (filtered.length === 0) {
+      toast({
+        title: 'Nenhum dado para exportar',
+        description: 'Não há pagamentos disponíveis no filtro atual.',
+      })
+      return
+    }
+
+    const headers = [
+      'ID Pagamento',
+      'Usuário Nome',
+      'Usuário Email',
+      'Valor (BRL)',
+      'Status',
+      'Método de Pagamento',
+      'Provedor',
+      'ID Cobrança Gateway',
+      'ID Assinatura Gateway',
+      'Data Pagamento',
+      'Data Criação',
+    ]
+
+    const rows = filtered.map((p) => {
+      const u = userMap.get(p.user)
+      return [
+        `"${p.id}"`,
+        `"${(u?.name || p.user).replace(/"/g, '""')}"`,
+        `"${(u?.email || '').replace(/"/g, '""')}"`,
+        p.amount || 0,
+        `"${p.status}"`,
+        `"${p.payment_method_type || 'other'}"`,
+        `"${p.gateway_provider || 'asaas'}"`,
+        `"${p.gateway_payment_id || ''}"`,
+        `"${p.gateway_subscription_id || ''}"`,
+        `"${p.paid_at || ''}"`,
+        `"${p.created}"`,
+      ].join(',')
+    })
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n')
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement('a')
+    link.setAttribute('href', encodedUri)
+    link.setAttribute(
+      'download',
+      `studiofreela_pagamentos_${new Date().toISOString().slice(0, 10)}.csv`,
+    )
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast({
+      title: 'Exportação Concluída',
+      description: `${filtered.length} registro(s) exportado(s) com sucesso.`,
+    })
+  }
 
   // Stats
   const totalReceived = payments
@@ -64,15 +129,26 @@ export const AdminPayments: React.FC = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold font-serif text-white tracking-tight">
-          Histórico de Pagamentos
-        </h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Auditoria de transações processadas, cobranças aprovadas, recusas e conciliação bancária.
-        </p>
-      </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold font-serif text-white tracking-tight">
+            Histórico de Pagamentos Asaas
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Auditoria de faturas, transações via Pix/Boleto/Cartão, conciliação e falhas.
+          </p>
+        </div>
 
+        <Button
+          onClick={handleExportCsv}
+          variant="outline"
+          size="sm"
+          className="bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 text-xs h-9 gap-1.5 self-start sm:self-auto"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Exportar CSV ({filtered.length})
+        </Button>
+      </div>
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="bg-slate-900/90 border-slate-800 text-slate-100">
@@ -167,6 +243,7 @@ export const AdminPayments: React.FC = () => {
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">ID Transação</th>
                   <th className="py-3 px-4">Data</th>
+                  <th className="py-3 px-4 text-right">Fatura</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
@@ -182,7 +259,13 @@ export const AdminPayments: React.FC = () => {
                         {formatCurrency(p.amount)}
                       </td>
                       <td className="py-3.5 px-4 capitalize text-slate-300">
-                        {p.payment_method_type || 'PIX'}
+                        {p.payment_method_type === 'pix'
+                          ? 'PIX Instantâneo'
+                          : p.payment_method_type === 'credit_card'
+                            ? 'Cartão de Crédito'
+                            : p.payment_method_type === 'boleto'
+                              ? 'Boleto Bancário'
+                              : p.payment_method_type || 'PIX'}
                       </td>
                       <td className="py-3.5 px-4">
                         <Badge
@@ -192,10 +275,18 @@ export const AdminPayments: React.FC = () => {
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                               : p.status === 'failed'
                                 ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                                : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                : p.status === 'refunded'
+                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                                  : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                           }
                         >
-                          {p.status}
+                          {p.status === 'succeeded'
+                            ? 'Aprovado'
+                            : p.status === 'failed'
+                              ? 'Recusado / Vencido'
+                              : p.status === 'refunded'
+                                ? 'Estornado'
+                                : 'Pendente'}
                         </Badge>
                         {p.failure_reason && (
                           <span className="block text-[10px] text-rose-400 mt-0.5">
@@ -208,6 +299,24 @@ export const AdminPayments: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-slate-400">
                         {p.paid_at ? formatDate(p.paid_at) : formatDate(p.created)}
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        {(p.invoice_url || p.bank_slip_url) && (
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-[11px] gap-1 text-slate-300 hover:text-white"
+                          >
+                            <a
+                              href={p.invoice_url || p.bank_slip_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink className="w-3 h-3" /> Ver
+                            </a>
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   )

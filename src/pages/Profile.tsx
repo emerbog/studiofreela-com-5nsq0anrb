@@ -66,6 +66,7 @@ import { calculateProfileCompleteness } from '@/lib/profile-completeness'
 import { ResumePreviewModal } from '@/components/ResumePreviewModal'
 import { downloadResumeBinaryPdf, shareResumePdfFile, ResumePdfTheme } from '@/lib/resume-pdf'
 import { formatCurrency } from '@/lib/formatters'
+import { SubscriptionPlanModal } from '@/components/SubscriptionPlanModal'
 import {
   User,
   Mail,
@@ -217,6 +218,7 @@ export default function Profile() {
   // PDF Preview Modal
   const [previewModalOpen, setPreviewModalOpen] = useState(false)
   const [pdfTheme, setPdfTheme] = useState<ResumePdfTheme>('bronze')
+  const [planModalOpen, setPlanModalOpen] = useState(false)
 
   // Password fields state
   const [oldPassword, setOldPassword] = useState('')
@@ -957,6 +959,17 @@ export default function Profile() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setPlanModalOpen(true)}
+                className="text-xs h-8 gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Gerenciar Plano / Upgrade
+              </Button>
+
               <Button
                 type="button"
                 size="sm"
@@ -2807,6 +2820,9 @@ export default function Profile() {
         theme={pdfTheme}
         onThemeChange={setPdfTheme}
       />
+
+      {/* Modal de Gestão de Planos & Assinatura Asaas */}
+      <SubscriptionPlanModal open={planModalOpen} onOpenChange={setPlanModalOpen} />
 
       {/* Dialog confirmação dupla exclusão de conta */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

@@ -164,8 +164,14 @@ export type SubscriptionItem = {
   current_period_start?: string
   current_period_end?: string
   cancel_at_period_end?: boolean
+  canceled_at?: string
   trial_end?: string
   gateway_provider?: string
+  gateway_customer_id?: string
+  gateway_subscription_id?: string
+  checkout_url?: string
+  billing_type?: string
+  next_due_date?: string
   created: string
 }
 
@@ -178,9 +184,45 @@ export type PaymentItem = {
   payment_method_type?: 'pix' | 'credit_card' | 'boleto' | 'other'
   gateway_provider?: string
   gateway_payment_id?: string
+  gateway_subscription_id?: string
+  invoice_url?: string
+  bank_slip_url?: string
+  due_date?: string
   paid_at?: string
   failure_reason?: string
   created: string
+}
+
+export type PlanConfig = {
+  id: PlanTier
+  name: string
+  price: number
+  currency: string
+  billingInterval: 'monthly' | 'yearly'
+  badge?: string
+  features: string[]
+}
+
+export type BillingConfigResponse = {
+  configured: boolean
+  environment: 'sandbox' | 'production'
+  plans: PlanConfig[]
+}
+
+export type CreateCheckoutParams = {
+  plan: PlanTier
+  cpfCnpj?: string
+}
+
+export type CreateCheckoutResponse = {
+  success: boolean
+  subscriptionId: string
+  customerId: string
+  plan: PlanTier
+  price: number
+  checkoutUrl: string
+  invoiceUrl?: string
+  message: string
 }
 
 export type SupportTicket = {

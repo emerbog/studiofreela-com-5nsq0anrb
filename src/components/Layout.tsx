@@ -36,8 +36,10 @@ import {
   ExternalLink,
   Bell,
   Check,
+  CreditCard,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { SubscriptionPlanModal } from '@/components/SubscriptionPlanModal'
 import { ClientFormSheet } from './ClientFormSheet'
 import { EventFormDialog } from './EventFormDialog'
 import { QuoteFormSheet } from './QuoteFormSheet'
@@ -81,6 +83,7 @@ export function Layout() {
   const { user, logout } = useAuth()
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState<number>(0)
+  const [planModalOpen, setPlanModalOpen] = useState(false)
 
   useEffect(() => {
     if (!user?.id) return
@@ -283,6 +286,13 @@ export function Layout() {
                   Meu Perfil & Senha
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  onClick={() => setPlanModalOpen(true)}
+                  className="cursor-pointer text-primary"
+                >
+                  <CreditCard className="w-4 h-4 mr-2 text-primary" />
+                  Planos & Assinatura (Asaas)
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onClick={() => navigate('/admin')}
                   className="cursor-pointer text-emerald-600 font-medium"
                 >
@@ -442,6 +452,13 @@ export function Layout() {
                     Meu Perfil
                   </DropdownMenuItem>
                   <DropdownMenuItem
+                    onClick={() => setPlanModalOpen(true)}
+                    className="cursor-pointer text-primary"
+                  >
+                    <CreditCard className="w-4 h-4 mr-2 text-primary" />
+                    Planos & Assinatura (Asaas)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     onClick={() => navigate('/admin')}
                     className="cursor-pointer text-emerald-600 font-medium"
                   >
@@ -472,6 +489,8 @@ export function Layout() {
           </div>
         </main>
       </div>
+
+      <SubscriptionPlanModal open={planModalOpen} onOpenChange={setPlanModalOpen} />
     </SidebarProvider>
   )
 }
