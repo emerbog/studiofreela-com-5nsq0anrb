@@ -6,8 +6,13 @@ routerAdd(
   '/backend/v1/billing/config',
   (e) => {
     const asaasKey = $os.getenv('ASAAS_API_KEY') || ''
-    const rawUrl = $os.getenv('ASAAS_API_URL') || 'https://api-sandbox.asaas.com/v3'
-    const isSandbox = rawUrl.indexOf('sandbox') !== -1
+    const envVal = ($os.getenv('ASAAS_ENV') || '').toLowerCase().trim()
+    let rawUrl = $os.getenv('ASAAS_API_URL') || ''
+    if (!rawUrl) {
+      rawUrl =
+        envVal === 'production' ? 'https://api.asaas.com/v3' : 'https://api-sandbox.asaas.com/v3'
+    }
+    const isSandbox = envVal === 'production' ? false : rawUrl.indexOf('sandbox') !== -1
 
     return e.json(200, {
       configured: Boolean(asaasKey && asaasKey.trim().length > 0),

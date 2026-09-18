@@ -78,7 +78,12 @@ routerAdd('POST', '/backend/v1/webhooks/asaas', (e) => {
 
   // 2. Revalidação na API do Asaas (Never trust payload alone for billing state changes)
   const asaasKey = $os.getenv('ASAAS_API_KEY') || ''
-  let asaasUrl = $os.getenv('ASAAS_API_URL') || 'https://api-sandbox.asaas.com/v3'
+  const envVal = ($os.getenv('ASAAS_ENV') || '').toLowerCase().trim()
+  let asaasUrl = $os.getenv('ASAAS_API_URL') || ''
+  if (!asaasUrl) {
+    asaasUrl =
+      envVal === 'production' ? 'https://api.asaas.com/v3' : 'https://api-sandbox.asaas.com/v3'
+  }
   if (asaasUrl.endsWith('/')) {
     asaasUrl = asaasUrl.slice(0, -1)
   }
