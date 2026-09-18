@@ -178,12 +178,21 @@ export default function Login() {
             </form>
           </CardContent>
 
-          <CardFooter className="flex flex-col border-t border-border/40 pt-4 text-center">
+          <CardFooter className="flex flex-col border-t border-border/40 pt-4 text-center space-y-2">
             <p className="text-xs text-muted-foreground">
               Ainda não tem uma conta?{' '}
               <Link to="/signup" className="text-primary font-medium hover:underline">
                 Cadastre-se gratuitamente
               </Link>
+            </p>
+            <p className="text-[11px] text-muted-foreground/80">
+              Dúvidas ou suporte?{' '}
+              <a
+                href="mailto:studiofreela@protonmail.com"
+                className="text-primary hover:underline font-medium"
+              >
+                studiofreela@protonmail.com
+              </a>
             </p>
           </CardFooter>
         </Card>

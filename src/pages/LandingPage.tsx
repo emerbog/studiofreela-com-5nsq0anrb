@@ -634,10 +634,10 @@ export default function LandingPage() {
                 </li>
                 <li>
                   <a
-                    href="mailto:suporte@studiofreela.com"
+                    href="mailto:studiofreela@protonmail.com"
                     className="hover:text-foreground transition-colors"
                   >
-                    suporte@studiofreela.com
+                    studiofreela@protonmail.com
                   </a>
                 </li>
               </ul>

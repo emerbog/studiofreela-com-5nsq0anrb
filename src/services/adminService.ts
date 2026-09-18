@@ -44,12 +44,13 @@ export const adminService = {
       | 'unblock'
       | 'revoke_sessions'
       | 'send_password_reset'
+      | 'send_welcome_email'
       | 'change_role'
       | 'change_plan'
       | 'toggle_pilot_access'
       | 'delete_account',
     details?: Record<string, any>,
-  ): Promise<{ success: boolean; message?: string }> {
+  ): Promise<{ success: boolean; message?: string; delivered?: boolean; method?: string }> {
     return await pb.send<{ success: boolean; message?: string }>(
       '/backend/v1/studio-admin/user-action',
       {

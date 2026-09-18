@@ -16,6 +16,7 @@ import {
   LogOut,
   RefreshCw,
   UserCheck,
+  Mail,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -74,6 +75,7 @@ export const AdminUsers: React.FC = () => {
       | 'unblock'
       | 'revoke'
       | 'reset_password'
+      | 'welcome_email'
       | 'delete'
       | 'view'
       | 'change_role'
@@ -189,6 +191,18 @@ export const AdminUsers: React.FC = () => {
       } else if (actionModal.type === 'reset_password') {
         await adminService.executeUserAction(actionModal.user.id, 'send_password_reset')
         toast.success('Solicitação de redefinição de senha registrada.')
+      } else if (actionModal.type === 'welcome_email') {
+        const res = await adminService.executeUserAction(actionModal.user.id, 'send_welcome_email')
+        if (res.delivered) {
+          toast.success(res.message || 'E-mail de boas-vindas enviado com sucesso!')
+        } else {
+          toast.info(
+            res.message || 'Intenção registrada. Configure os Secrets de SMTP/SendGrid no backend.',
+            {
+              duration: 6000,
+            },
+          )
+        }
       } else if (actionModal.type === 'change_role') {
         await adminService.executeUserAction(actionModal.user.id, 'change_role', {
           newRole: actionModal.newRole,
@@ -447,6 +461,18 @@ export const AdminUsers: React.FC = () => {
                         >
                           <KeyRound className="w-3.5 h-3.5" />
                         </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            setActionModal({ isOpen: true, type: 'welcome_email', user: u })
+                          }
+                          className="h-8 w-8 text-amber-400 hover:text-amber-300 hover:bg-amber-950/30"
+                          title="Reenviar e-mail de boas-vindas"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -529,6 +555,16 @@ export const AdminUsers: React.FC = () => {
                       Bloquear
                     </Button>
                   )}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActionModal({ isOpen: true, type: 'welcome_email', user: u })}
+                    className="h-8 text-xs text-amber-400 border-amber-900/50 bg-amber-950/20"
+                  >
+                    <Mail className="w-3.5 h-3.5 mr-1" />
+                    Boas-vindas
+                  </Button>
                 </div>
               </div>
             ))
@@ -551,6 +587,7 @@ export const AdminUsers: React.FC = () => {
               {actionModal.type === 'unblock' && 'Desbloquear Usuário'}
               {actionModal.type === 'revoke' && 'Encerrar Todas as Sessões'}
               {actionModal.type === 'reset_password' && 'Recuperação de Acesso'}
+              {actionModal.type === 'welcome_email' && 'Reenviar E-mail de Boas-Vindas'}
               {actionModal.type === 'change_role' && 'Alterar Papel de Acesso'}
               {actionModal.type === 'change_plan' && 'Alterar Plano do Freelancer'}
               {actionModal.type === 'delete' && 'Exclusão de Conta (LGPD)'}
@@ -793,6 +830,40 @@ export const AdminUsers: React.FC = () => {
                 Um e-mail formal de recuperação será acionado para{' '}
                 <strong>{actionModal.user?.email}</strong>. Por motivos de segurança e LGPD, novas
                 senhas nunca são geradas por administradores.
+              </p>
+            </div>
+          )}
+
+          {/* Welcome Email Mode */}
+          {actionModal.type === 'welcome_email' && (
+            <div className="py-2 text-xs text-slate-300 space-y-3">
+              <p>
+                Será disparado o e-mail oficial de boas-vindas do Studio Freela para{' '}
+                <strong>{actionModal.user?.name}</strong> (
+                <strong>{actionModal.user?.email}</strong>).
+              </p>
+              <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1.5">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-400">Remetente:</span>
+                  <span className="text-slate-200 font-mono">
+                    Studio Freela &lt;studiofreela@protonmail.com&gt;
+                  </span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-400">Assunto:</span>
+                  <span className="text-slate-200">
+                    Bem-vindo ao Studio Freela — seu acesso completo está pronto
+                  </span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-400">Destinatário:</span>
+                  <span className="text-slate-200 font-mono">{actionModal.user?.email}</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                O envio utiliza os Secrets configurados (Resend / SendGrid / Brevo / SMTP nativo).
+                Se nenhum serviço estiver ativo no momento, a intenção é registrada com segurança no
+                log de auditoria sem travar o sistema.
               </p>
             </div>
           )}

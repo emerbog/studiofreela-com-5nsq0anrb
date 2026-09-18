@@ -268,12 +268,21 @@ export default function Signup() {
             </form>
           </CardContent>
 
-          <CardFooter className="flex flex-col border-t border-border/40 pt-4 text-center">
+          <CardFooter className="flex flex-col border-t border-border/40 pt-4 text-center space-y-2">
             <p className="text-xs text-muted-foreground">
               Já possui uma conta?{' '}
               <Link to="/login" className="text-primary font-medium hover:underline">
                 Fazer login
               </Link>
+            </p>
+            <p className="text-[11px] text-muted-foreground/80">
+              Precisa de ajuda no cadastro?{' '}
+              <a
+                href="mailto:studiofreela@protonmail.com"
+                className="text-primary hover:underline font-medium"
+              >
+                studiofreela@protonmail.com
+              </a>
             </p>
           </CardFooter>
         </Card>

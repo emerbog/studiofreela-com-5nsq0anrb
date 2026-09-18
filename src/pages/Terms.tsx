@@ -46,8 +46,8 @@ export default function Terms() {
                 studiofreela.com
               </a>
               . Para fins de contato e suporte, o canal oficial é{' '}
-              <a href="mailto:suporte@studiofreela.com" className="text-foreground underline">
-                suporte@studiofreela.com
+              <a href="mailto:studiofreela@protonmail.com" className="text-foreground underline">
+                studiofreela@protonmail.com
               </a>
               .
             </p>
@@ -129,8 +129,8 @@ export default function Terms() {
             <p>
               O usuário pode solicitar o cancelamento e a exclusão completa de sua conta a qualquer
               momento diretamente no painel do usuário (seção Perfil / LGPD) ou através do e-mail{' '}
-              <a href="mailto:suporte@studiofreela.com" className="text-foreground underline">
-                suporte@studiofreela.com
+              <a href="mailto:studiofreela@protonmail.com" className="text-foreground underline">
+                studiofreela@protonmail.com
               </a>
               .
             </p>

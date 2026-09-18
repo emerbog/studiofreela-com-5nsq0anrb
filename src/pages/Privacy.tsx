@@ -44,7 +44,7 @@ export default function Privacy() {
               em ambiente seguro e canal de encarregado pelo tratamento de dados (DPO) através de:
             </p>
             <p className="bg-muted/40 p-3 rounded-lg border border-border/60 text-xs font-mono text-foreground">
-              Encarregado / Canal LGPD: suporte@studiofreela.com
+              Encarregado / Canal LGPD: studiofreela@protonmail.com
               <br />
               Site Oficial: https://studiofreela.com
             </p>
@@ -188,8 +188,8 @@ export default function Privacy() {
             <p>
               Dúvidas, solicitações ou exercícios de direitos do titular podem ser encaminhados ao
               e-mail{' '}
-              <a href="mailto:suporte@studiofreela.com" className="text-foreground underline">
-                suporte@studiofreela.com
+              <a href="mailto:studiofreela@protonmail.com" className="text-foreground underline">
+                studiofreela@protonmail.com
               </a>
               .
             </p>
