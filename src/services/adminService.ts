@@ -46,6 +46,7 @@ export const adminService = {
       | 'send_password_reset'
       | 'change_role'
       | 'change_plan'
+      | 'toggle_pilot_access'
       | 'delete_account',
     details?: Record<string, any>,
   ): Promise<{ success: boolean; message?: string }> {

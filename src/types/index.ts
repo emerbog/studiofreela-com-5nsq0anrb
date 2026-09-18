@@ -79,6 +79,7 @@ export type UserProfile = {
   address?: string
   cpfCnpj?: string
   plan_tier?: PlanTier
+  pilot_access?: boolean
   is_blocked?: boolean
   blocked_reason?: string
   last_login_at?: string
@@ -100,6 +101,7 @@ export type AdminUserItem = {
   address?: string
   profession?: string
   plan_tier: PlanTier
+  pilot_access?: boolean
   is_blocked?: boolean
   blocked_reason?: string
   last_login_at?: string
@@ -196,6 +198,18 @@ export type SupportTicket = {
     message: string
     created_at: string
   }>
+  created: string
+  updated: string
+}
+
+export type AppNotification = {
+  id: string
+  user: string
+  title: string
+  message: string
+  type: 'info' | 'warning' | 'success' | 'payment' | 'system'
+  read?: boolean
+  link?: string
   created: string
   updated: string
 }

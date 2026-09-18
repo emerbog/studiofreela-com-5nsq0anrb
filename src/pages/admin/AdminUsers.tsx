@@ -48,6 +48,25 @@ export const AdminUsers: React.FC = () => {
 
   // Selected user for modal / actions
   const [selectedUser, setSelectedUser] = useState<AdminUserItem | null>(null)
+
+  const togglePilotAccess = async (targetUser: AdminUserItem) => {
+    try {
+      const newStatus = !targetUser.pilot_access
+      await adminService.executeUserAction(targetUser.id, 'toggle_pilot_access', {
+        pilotAccess: newStatus,
+      })
+      toast.success(
+        newStatus
+          ? `Acesso ao piloto ativado para ${targetUser.name || targetUser.email}!`
+          : `Acesso ao piloto desativado para ${targetUser.name || targetUser.email}!`,
+      )
+      await refreshData()
+    } catch (err: any) {
+      toast.error('Erro ao atualizar status de piloto', {
+        description: err?.message || 'Falha na requisição.',
+      })
+    }
+  }
   const [actionModal, setActionModal] = useState<{
     isOpen: boolean
     type:
@@ -315,18 +334,25 @@ export const AdminUsers: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <Badge
-                        variant="outline"
-                        className={
-                          u.plan_tier === 'advanced' || u.plan_tier === 'premium'
-                            ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 capitalize'
-                            : u.plan_tier === 'intermediate'
-                              ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 capitalize'
-                              : 'bg-slate-800 text-slate-400 border-slate-700 capitalize'
-                        }
-                      >
-                        {u.plan_tier}
-                      </Badge>
+                      <div className="flex flex-col gap-1 items-start">
+                        <Badge
+                          variant="secondary"
+                          className={
+                            u.plan_tier === 'advanced' || u.plan_tier === 'premium'
+                              ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
+                              : u.plan_tier === 'intermediate'
+                                ? 'bg-sky-500/10 text-sky-700 border-sky-500/20'
+                                : 'bg-slate-500/10 text-slate-700 border-slate-500/20'
+                          }
+                        >
+                          {u.plan_tier}
+                        </Badge>
+                        {u.pilot_access && (
+                          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0">
+                            Piloto
+                          </Badge>
+                        )}
+                      </div>{' '}
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -459,6 +485,11 @@ export const AdminUsers: React.FC = () => {
                   <span className="capitalize px-2 py-0.5 rounded bg-slate-800 text-[11px] text-slate-300">
                     {u.plan_tier}
                   </span>
+                  {u.pilot_access && (
+                    <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0">
+                      Piloto
+                    </Badge>
+                  )}
                   <span>•</span>
                   <span>Papel: {u.role}</span>
                   <span>•</span>
@@ -542,7 +573,7 @@ export const AdminUsers: React.FC = () => {
                 <div>
                   <span className="text-slate-500 block">Plano Atual</span>
                   <span className="text-emerald-400 font-semibold capitalize">
-                    {actionModal.user.plan_tier}
+                    {actionModal.user.plan_tier} {actionModal.user.pilot_access ? '(Piloto)' : ''}
                   </span>
                 </div>
                 <div>
@@ -713,6 +744,35 @@ export const AdminUsers: React.FC = () => {
                   <SelectItem value="premium">Premium (Ilimitado)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {/* Toggle Pilot Access */}
+          {actionModal.type === 'view' && actionModal.user && (
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+              <div>
+                <span className="text-slate-200 font-semibold text-xs block">
+                  Acesso Completo do Piloto
+                </span>
+                <span className="text-slate-400 text-[11px] block">
+                  {actionModal.user.pilot_access
+                    ? 'Usuário com acesso ilimitado liberado para o teste do piloto.'
+                    : 'Liberar acesso completo e irrestrito sem bloqueio de planos.'}
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant={actionModal.user.pilot_access ? 'destructive' : 'default'}
+                className="text-xs h-8"
+                onClick={async () => {
+                  if (actionModal.user) {
+                    await togglePilotAccess(actionModal.user)
+                    setActionModal({ isOpen: false, type: 'view', user: null })
+                  }
+                }}
+              >
+                {actionModal.user.pilot_access ? 'Revogar Piloto' : 'Ativar Piloto'}
+              </Button>
             </div>
           )}
 

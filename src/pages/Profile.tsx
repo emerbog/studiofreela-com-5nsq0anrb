@@ -932,10 +932,22 @@ export default function Profile() {
                 <h2 className="text-xl font-bold font-serif text-foreground">
                   {commercialName || name || 'Profissional Studio Freela'}
                 </h2>
-                {user?.plan_tier && (
-                  <Badge variant="outline" className="w-fit mx-auto sm:mx-0 text-[11px] capitalize">
-                    Plano {user.plan_tier}
+                {user?.pilot_access ? (
+                  <Badge
+                    variant="secondary"
+                    className="w-fit mx-auto sm:mx-0 text-[11px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-semibold"
+                  >
+                    Piloto Convidado (Acesso Completo)
                   </Badge>
+                ) : (
+                  user?.plan_tier && (
+                    <Badge
+                      variant="outline"
+                      className="w-fit mx-auto sm:mx-0 text-[11px] capitalize"
+                    >
+                      Plano {user.plan_tier}
+                    </Badge>
+                  )
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -1995,17 +2007,27 @@ export default function Profile() {
                     </h3>
                   </div>
                   <p className="text-xs text-muted-foreground max-w-xl">
-                    Recurso exclusivo para assinantes dos planos <strong>Intermediate</strong> e{' '}
-                    <strong>Advanced</strong>. Publique um mini-site elegante no endereço{' '}
-                    <code>studiofreela.com/p/seu-nome</code> com link para WhatsApp e QR Code
-                    exclusivo.
+                    {user?.pilot_access ? (
+                      <>
+                        Liberado para o seu usuário do <strong>Piloto Studio Freela</strong>. Você
+                        terá acesso prioritário ao mini-site e apresentação pública no endereço{' '}
+                        <code>studiofreela.com/p/seu-nome</code> com link para WhatsApp e QR Code.
+                      </>
+                    ) : (
+                      <>
+                        Recurso exclusivo para assinantes dos planos <strong>Intermediate</strong> e{' '}
+                        <strong>Advanced</strong>. Publique um mini-site elegante no endereço{' '}
+                        <code>studiofreela.com/p/seu-nome</code> com link para WhatsApp e QR Code
+                        exclusivo.
+                      </>
+                    )}
                   </p>
                 </div>
                 <Badge
                   variant="outline"
                   className="self-start sm:self-auto bg-amber-500/10 text-amber-600 border-amber-500/30"
                 >
-                  Próxima Rodada (Fase 3)
+                  {user?.pilot_access ? 'Acesso Antecipado Piloto' : 'Próxima Rodada (Fase 3)'}
                 </Badge>
               </div>
             </div>

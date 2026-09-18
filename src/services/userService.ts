@@ -24,6 +24,7 @@ export const userService = {
         profession: record.profession || '',
         address: record.address || '',
         plan_tier: record.plan_tier || 'economy',
+        pilot_access: !!(record as any).pilot_access,
         created: record.created,
         updated: record.updated,
       }
@@ -43,6 +44,7 @@ export const userService = {
       profession: updated.profession || '',
       address: updated.address || '',
       plan_tier: updated.plan_tier || 'economy',
+      pilot_access: !!(updated as any).pilot_access,
       created: updated.created,
       updated: updated.updated,
     }

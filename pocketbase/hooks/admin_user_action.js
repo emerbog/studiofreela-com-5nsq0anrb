@@ -203,6 +203,28 @@ routerAdd(
       return e.json(200, { success: true, message: 'Plano atualizado para ' + newPlan })
     }
 
+    if (action === 'toggle_pilot_access') {
+      if (role !== 'admin' && role !== 'suporte') {
+        return e.json(403, {
+          error: 'Apenas Administradores e Suporte podem gerenciar acesso ao piloto.',
+        })
+      }
+      const newPilotAccess = !!details.pilotAccess
+      targetUser.set('pilot_access', newPilotAccess)
+      $app.save(targetUser)
+
+      logAudit('pilot_access_changed', {
+        target_email: targetEmail,
+        pilot_access: newPilotAccess,
+      })
+      return e.json(200, {
+        success: true,
+        message: newPilotAccess
+          ? 'Acesso completo ao piloto ativado com sucesso.'
+          : 'Acesso ao piloto desativado com sucesso.',
+      })
+    }
+
     if (action === 'delete_account') {
       if (role !== 'admin') {
         return e.json(403, {

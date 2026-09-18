@@ -14,6 +14,7 @@ import pb from '@/lib/pocketbase/client'
 
 type AppDataContextType = {
   currentTier: PlanTier
+  isPilotUser: boolean
   setCurrentTier: (tier: PlanTier) => Promise<void>
   clients: Client[]
   events: AppEvent[]
@@ -47,8 +48,9 @@ const AppDataContext = createContext<AppDataContextType | undefined>(undefined)
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, updateProfile } = useAuth()
-  const [currentTier, setCurrentTierState] = useState<PlanTier>(
-    () => user?.plan_tier || 'intermediate',
+  const isPilotUser = !!user?.pilot_access
+  const [currentTier, setCurrentTierState] = useState<PlanTier>(() =>
+    user?.pilot_access ? 'advanced' : user?.plan_tier || 'intermediate',
   )
 
   const [clients, setClients] = useState<Client[]>([])
@@ -60,10 +62,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   // Sync tier with user profile
   useEffect(() => {
-    if (user?.plan_tier && user.plan_tier !== currentTier) {
+    if (user?.pilot_access) {
+      if (currentTier !== 'advanced') {
+        setCurrentTierState('advanced')
+      }
+    } else if (user?.plan_tier && user.plan_tier !== currentTier) {
       setCurrentTierState(user.plan_tier)
     }
-  }, [user?.plan_tier])
+  }, [user?.plan_tier, user?.pilot_access])
 
   const setCurrentTier = async (tier: PlanTier) => {
     setCurrentTierState(tier)
@@ -424,6 +430,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     <AppDataContext.Provider
       value={{
         currentTier,
+        isPilotUser,
         setCurrentTier,
         clients,
         events,

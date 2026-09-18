@@ -102,6 +102,7 @@ routerAdd(
         address: u.getString('address'),
         profession: u.getString('profession'),
         plan_tier: u.getString('plan_tier') || 'economy',
+        pilot_access: u.getBool('pilot_access'),
         is_blocked: u.getBool('is_blocked'),
         blocked_reason: u.getString('blocked_reason'),
         last_login_at: u.getString('last_login_at'),

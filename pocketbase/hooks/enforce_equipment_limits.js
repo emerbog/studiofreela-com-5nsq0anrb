@@ -10,18 +10,29 @@ onRecordCreateRequest((e) => {
   // Ensure record user matches authenticated user
   e.record.set('user', auth.id)
 
-  const planTier = auth.getString('plan_tier') || 'economy'
+  const isPilot = auth.getBool('pilot_access')
+  const authEmail = (auth.getString('email') || '').toLowerCase().trim()
+  const pilotEmailsEnv = ($os.getenv('PILOT_EMAILS') || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+  const isPilotGuest = isPilot || pilotEmailsEnv.indexOf(authEmail) !== -1
 
-  // Economy limit: up to 5 equipment items
-  if (planTier === 'economy') {
-    const totalEquipment = $app.countRecords(
-      'professional_equipment',
-      $dbx.exp('user = {:u}', { u: auth.id }),
-    )
-    if (totalEquipment >= 5) {
-      throw new BadRequestError(
-        'Limite do plano Economy atingido (máximo 5 equipamentos para locação). Faça upgrade para o plano Intermediate ou Advanced para cadastros ilimitados.',
+  // Pilot users have unlimited equipment creation
+  if (!isPilotGuest) {
+    const planTier = auth.getString('plan_tier') || 'economy'
+
+    // Economy limit: up to 5 equipment items
+    if (planTier === 'economy') {
+      const totalEquipment = $app.countRecords(
+        'professional_equipment',
+        $dbx.exp('user = {:u}', { u: auth.id }),
       )
+      if (totalEquipment >= 5) {
+        throw new BadRequestError(
+          'Limite do plano Economy atingido (máximo 5 equipamentos para locação). Faça upgrade para o plano Intermediate ou Advanced para cadastros ilimitados.',
+        )
+      }
     }
   }
 

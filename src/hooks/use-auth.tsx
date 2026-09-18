@@ -43,6 +43,7 @@ const mapAuthModelToUser = (model: any): UserProfile | null => {
     profession: model.profession || '',
     address: model.address || '',
     plan_tier: (model.plan_tier as PlanTier) || 'economy',
+    pilot_access: !!model.pilot_access,
     created: model.created,
     updated: model.updated,
   }

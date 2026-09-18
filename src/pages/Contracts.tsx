@@ -33,14 +33,15 @@ import {
 } from '@/components/ui/alert-dialog'
 
 export default function Contracts() {
-  const { currentTier, setCurrentTier, contracts, clients, quotes, deleteContract } = useAppData()
+  const { currentTier, isPilotUser, setCurrentTier, contracts, clients, quotes, deleteContract } =
+    useAppData()
   const [activeTab, setActiveTab] = useState<'list' | 'create' | 'view'>('list')
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null)
   const [contractToDelete, setContractToDelete] = useState<Contract | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
 
   const tierPriority = { economy: 1, intermediate: 2, advanced: 3, premium: 3 }
-  const isLocked = tierPriority[currentTier] < tierPriority.advanced
+  const isLocked = !isPilotUser && tierPriority[currentTier] < tierPriority.advanced
 
   if (isLocked) {
     return (
@@ -132,7 +133,7 @@ export default function Contracts() {
                   variant="secondary"
                   className="text-xs bg-accent/15 text-accent-foreground font-sans border-accent/30"
                 >
-                  Plano Advanced
+                  {isPilotUser ? 'Liberado Piloto' : 'Plano Advanced'}
                 </Badge>
               </div>
               <p className="text-muted-foreground">

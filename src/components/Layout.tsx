@@ -34,12 +34,16 @@ import {
   LogOut,
   ShieldCheck,
   ExternalLink,
+  Bell,
+  Check,
 } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { ClientFormSheet } from './ClientFormSheet'
 import { EventFormDialog } from './EventFormDialog'
 import { QuoteFormSheet } from './QuoteFormSheet'
 import { useAppData } from '@/hooks/use-app-data'
 import { useAuth } from '@/hooks/use-auth'
+import pb from '@/lib/pocketbase/client'
 import { getAvatarUrl } from '@/services/userService'
 import { cn } from '@/lib/utils'
 import { PlanTier } from '@/types'
@@ -73,8 +77,60 @@ const tierPriority: Record<PlanTier, number> = {
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { currentTier, setCurrentTier } = useAppData()
+  const { currentTier, isPilotUser, setCurrentTier } = useAppData()
   const { user, logout } = useAuth()
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [unreadCount, setUnreadCount] = useState<number>(0)
+
+  useEffect(() => {
+    if (!user?.id) return
+    const fetchNotifications = async () => {
+      try {
+        const res = await pb.collection('notifications').getList(1, 10, {
+          sort: '-created',
+          filter: `user = "${user.id}"`,
+        })
+        setNotifications(res.items)
+        setUnreadCount(res.items.filter((n: any) => !n.read).length)
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+
+    fetchNotifications()
+
+    // Subscribe to realtime notifications if possible
+    try {
+      pb.collection('notifications').subscribe('*', (e) => {
+        if (e.record && (e.record as any).user === user.id) {
+          fetchNotifications()
+        }
+      })
+    } catch {
+      /* intentionally ignored */
+    }
+
+    return () => {
+      try {
+        pb.collection('notifications').unsubscribe('*')
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+  }, [user?.id])
+
+  const markAllAsRead = async () => {
+    try {
+      const unread = notifications.filter((n) => !n.read)
+      await Promise.all(
+        unread.map((n) => pb.collection('notifications').update(n.id, { read: true })),
+      )
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+      setUnreadCount(0)
+    } catch {
+      /* intentionally ignored */
+    }
+  }
 
   const currentTitle =
     navItems.find((item) => item.url === location.pathname)?.title || 'Studio Freela'
@@ -181,11 +237,13 @@ export function Layout() {
                   <div className="flex items-center justify-between font-medium">
                     <span>Studio Freela</span>
                     <span className="capitalize text-primary font-semibold text-[11px] bg-primary/10 px-2 py-0.5 rounded">
-                      Acesso Beta
+                      {isPilotUser ? 'Piloto Convidado' : 'Acesso Beta'}
                     </span>
                   </div>
                   <p className="text-[11px] text-sidebar-foreground/60 leading-relaxed">
-                    Fluxo completo de orçamentos, agenda e financeiro liberado no período beta.
+                    {isPilotUser
+                      ? 'Você tem acesso completo e irrestrito a todos os módulos e recursos durante o teste do piloto!'
+                      : 'Fluxo completo de orçamentos, agenda e financeiro liberado no período beta.'}
                   </p>
                 </div>
               </SidebarGroupContent>
@@ -254,6 +312,69 @@ export function Layout() {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Notificações in-app */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    aria-label="Notificações"
+                    className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Bell className="w-4 h-4" />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-accent ring-2 ring-background animate-pulse" />
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80 sm:w-96 p-0 shadow-lg">
+                  <div className="flex items-center justify-between p-3 border-b border-border/60">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-xs text-foreground">Notificações</span>
+                      {unreadCount > 0 && (
+                        <span className="text-[10px] bg-accent/20 text-accent font-semibold px-1.5 py-0.2 rounded-full">
+                          {unreadCount} nova{unreadCount > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllAsRead}
+                        className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                      >
+                        <Check className="w-3 h-3" /> Marcar lidas
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-80 overflow-y-auto divide-y divide-border/40">
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-muted-foreground">
+                        Nenhuma notificação no momento.
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className={cn(
+                            'p-3 text-xs space-y-1 transition-colors',
+                            !n.read ? 'bg-accent/5 font-medium' : 'hover:bg-muted/40',
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-foreground font-semibold text-xs">{n.title}</span>
+                            {!n.read && (
+                              <span className="w-2 h-2 rounded-full bg-accent shrink-0 mt-1" />
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            {n.message}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
