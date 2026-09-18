@@ -17,6 +17,12 @@ interface AuthContextType {
     passwordConfirm: string
   }) => Promise<{ success: boolean; error?: string }>
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>
+  isGoogleAuthAvailable: boolean
+  googleConfigDetails: {
+    configured: boolean
+    redirectUri: string
+    backendUrl: string
+  }
   logout: () => void
   refreshUser: () => Promise<void>
   updateProfile: (
@@ -53,6 +59,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<UserProfile | null>(() => mapAuthModelToUser(pb.authStore.model))
   const [token, setToken] = useState<string | null>(pb.authStore.token || null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isGoogleAuthAvailable, setIsGoogleAuthAvailable] = useState<boolean>(false)
+
+  const backendUrl = pb.baseUrl || ''
+  const redirectUri = backendUrl ? `${backendUrl.replace(/\/$/, '')}/api/oauth2-redirect` : ''
+
+  // Verificar métodos de autenticação disponíveis dinamicamente
+  useEffect(() => {
+    let isMounted = true
+    const checkAuthMethods = async () => {
+      try {
+        const methods = await pb.collection('users').listAuthMethods()
+        if (!isMounted) return
+        const hasGoogle = !!methods?.oauth2?.providers?.some((p: any) => p.name === 'google')
+        setIsGoogleAuthAvailable(hasGoogle)
+      } catch (_) {
+        if (!isMounted) return
+        // Em caso de erro na checagem ou offline, manter false
+        setIsGoogleAuthAvailable(false)
+      }
+    }
+
+    checkAuthMethods()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   useEffect(() => {
     const unsub = pb.authStore.onChange((tokenVal, model) => {
@@ -138,14 +170,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const loginWithGoogle = async () => {
     try {
-      const authData = await pb.collection('users').authWithOAuth2({ provider: 'google' })
+      const authData = await pb.collection('users').authWithOAuth2({
+        provider: 'google',
+        urlCallback: (url) => {
+          // Garante abertura da janela sem ser bloqueada por pop-up blocker
+          window.open(url, '_blank', 'width=520,height=620,menubar=no,toolbar=no')
+        },
+      })
       const profile = mapAuthModelToUser(authData.record)
       setUser(profile)
       setToken(authData.token)
-      toast.success('Autenticação com Google concluída!')
+      toast.success('Autenticação com Google concluída!', {
+        description: `Bem-vindo, ${profile?.name || 'usuário'}!`,
+      })
       return { success: true }
     } catch (err: any) {
-      // Se a janela popup for fechada pelo usuário ou cancelada
       const isCancelled =
         err?.isAbort ||
         err?.message?.toLowerCase().includes('abort') ||
@@ -153,32 +192,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         err?.message?.toLowerCase().includes('closed')
 
       if (isCancelled) {
-        toast.info('Login cancelado', {
-          description: 'A janela de autenticação com o Google foi fechada.',
+        toast.info('Autenticação cancelada', {
+          description: 'A janela do Google foi fechada antes de concluir.',
         })
         return { success: false, error: 'Login cancelado pelo usuário.' }
       }
 
-      // Provedor Google ainda não configurado ou erro 400 de provider
       const errStr =
-        `${err?.message || ''} ${err?.response?.message || ''} ${err?.status || ''}`.toLowerCase()
+        `${err?.message || ''} ${err?.response?.message || ''} ${err?.status || ''} ${JSON.stringify(err?.response?.data || {})}`.toLowerCase()
       const isMissingConfig =
         err?.status === 400 ||
         err?.status === 404 ||
-        errStr.includes('provider') ||
-        errStr.includes('oauth') ||
         errStr.includes('missing') ||
+        errStr.includes('not supported') ||
+        errStr.includes('not configured') ||
+        errStr.includes('invalid oauth2 provider') ||
         errStr.includes('failed to authenticate')
 
       const friendlyMessage = isMissingConfig
-        ? 'O login com Google ainda está aguardando as chaves de integração do projeto. Por gentileza, entre com seu e-mail e senha cadastrados.'
+        ? 'O login com Google está aguardando as chaves Client ID / Secret no painel. Utilize seu e-mail e senha cadastrados.'
         : err?.response?.message ||
           err?.message ||
-          'Não foi possível conectar com o Google no momento.'
+          'Não foi possível autenticar com o Google. Tente entrar com e-mail e senha.'
 
       toast.error('Acesso com Google', {
         description: friendlyMessage,
-        duration: 5000,
+        duration: 5500,
       })
       return { success: false, error: friendlyMessage }
     }
@@ -252,6 +291,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         signup,
         loginWithGoogle,
+        isGoogleAuthAvailable,
+        googleConfigDetails: {
+          configured: isGoogleAuthAvailable,
+          redirectUri,
+          backendUrl,
+        },
         logout,
         refreshUser,
         updateProfile,
