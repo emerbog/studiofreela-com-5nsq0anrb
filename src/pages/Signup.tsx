@@ -12,15 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { User, Mail, Lock, Loader2, ArrowLeft, AlertCircle, Info, Copy, Check } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { User, Mail, Lock, Loader2, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { isValidEmail } from '@/lib/validators'
@@ -32,10 +24,7 @@ export default function Signup() {
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false)
-  const [showConfigModal, setShowConfigModal] = useState(false)
-  const [copiedRedirect, setCopiedRedirect] = useState(false)
-  const { signup, loginWithGoogle, isGoogleAuthAvailable, googleConfigDetails } = useAuth()
+  const { signup } = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,10 +36,6 @@ export default function Signup() {
     }
     if (!email.trim()) {
       toast.error('Informe seu e-mail.')
-      return
-    }
-    if (!name.trim()) {
-      toast.error('Informe seu nome completo.')
       return
     }
     if (!isValidEmail(email)) {
@@ -76,30 +61,6 @@ export default function Signup() {
 
     if (result.success) {
       navigate('/dashboard', { replace: true })
-    }
-  }
-
-  const handleGoogleSignup = async () => {
-    if (!isGoogleAuthAvailable) {
-      setShowConfigModal(true)
-      return
-    }
-
-    setIsGoogleSubmitting(true)
-    const result = await loginWithGoogle()
-    setIsGoogleSubmitting(false)
-
-    if (result.success) {
-      navigate('/dashboard', { replace: true })
-    }
-  }
-
-  const handleCopyRedirect = () => {
-    if (googleConfigDetails.redirectUri) {
-      navigator.clipboard.writeText(googleConfigDetails.redirectUri)
-      setCopiedRedirect(true)
-      toast.success('URI copiada para a área de transferência!')
-      setTimeout(() => setCopiedRedirect(false), 2500)
     }
   }
 
@@ -181,71 +142,6 @@ export default function Signup() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full flex items-center justify-center gap-2.5 h-10 border-border/80 hover:bg-muted/50 transition-colors"
-                onClick={handleGoogleSignup}
-                disabled={isGoogleSubmitting || isSubmitting}
-              >
-                {isGoogleSubmitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                    />
-                  </svg>
-                )}
-                <span>Cadastrar com Google</span>
-                {!isGoogleAuthAvailable && (
-                  <span className="ml-1 text-[10px] text-amber-700 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded font-normal">
-                    Configuração
-                  </span>
-                )}
-              </Button>
-
-              {!isGoogleAuthAvailable && (
-                <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/50 text-[11px] text-muted-foreground">
-                  <Info className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                  <span>
-                    Chaves do Google Cloud pendentes.{' '}
-                    <button
-                      type="button"
-                      onClick={() => setShowConfigModal(true)}
-                      className="text-primary hover:underline font-medium inline-block"
-                    >
-                      Como habilitar
-                    </button>{' '}
-                    ou crie com seus dados abaixo.
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border/60" />
-              </div>
-              <div className="relative flex justify-center text-[11px] uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Ou com seus dados</span>
-              </div>
-            </div>
-
             <form onSubmit={handleSubmit} className="space-y-3.5">
               <div className="space-y-1.5">
                 <Label htmlFor="name" className="text-xs font-medium">
@@ -359,7 +255,7 @@ export default function Signup() {
               <Button
                 type="submit"
                 className="w-full font-medium h-10 mt-3 shadow-sm"
-                disabled={isSubmitting || isGoogleSubmitting}
+                disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
@@ -382,109 +278,6 @@ export default function Signup() {
           </CardFooter>
         </Card>
       </div>
-
-      {/* Modal explicativo com as instruções e URI de redirecionamento exata */}
-      <Dialog open={showConfigModal} onOpenChange={setShowConfigModal}>
-        <DialogContent className="max-w-md sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-serif">
-              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-              Configuração do Google OAuth
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              O backend PocketBase requer que o Client ID e Client Secret sejam registrados para
-              habilitar o cadastro e login com o Google.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3.5 text-xs text-foreground/90 py-2">
-            <p className="leading-relaxed">
-              Enquanto as credenciais do Google Cloud Console não forem adicionadas aos secrets do
-              projeto, o cadastro gratuito diretamente pelo formulário está totalmente funcional.
-            </p>
-
-            <div className="space-y-2 p-3 bg-muted/50 rounded-lg border border-border/70">
-              <span className="font-semibold text-foreground block">
-                Passo 1: Criar credencial no Google Cloud Console
-              </span>
-              <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                <li>
-                  Acesse{' '}
-                  <strong>Google Cloud Console &gt; APIs &amp; Services &gt; Credentials</strong>.
-                </li>
-                <li>
-                  Crie um <strong>OAuth 2.0 Client ID</strong> do tipo <em>Web application</em>.
-                </li>
-                <li>
-                  Em <strong>Authorized redirect URIs</strong>, adicione exatamente a URL abaixo:
-                </li>
-              </ol>
-
-              <div className="mt-2">
-                <div className="flex items-center gap-1.5 bg-background p-2 rounded border border-border/80 font-mono text-[11px] break-all select-all">
-                  <span className="flex-1 text-foreground">
-                    {googleConfigDetails.redirectUri ||
-                      'https://gestao-freelance-elegante-8ed44.shrd00.internal.goskip.dev/api/oauth2-redirect'}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 shrink-0"
-                    onClick={handleCopyRedirect}
-                    title="Copiar URI"
-                  >
-                    {copiedRedirect ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-1 p-3 bg-muted/30 rounded-lg border border-border/70">
-              <span className="font-semibold text-foreground block">
-                Passo 2: Registrar as variáveis no projeto
-              </span>
-              <p className="text-muted-foreground">
-                Defina as seguintes variáveis com os valores gerados pelo Google:
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-muted-foreground font-mono text-[11px] mt-1">
-                <li>
-                  <strong>GOOGLE_CLIENT_ID</strong>
-                </li>
-                <li>
-                  <strong>GOOGLE_CLIENT_SECRET</strong>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <DialogFooter className="sm:justify-between gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowConfigModal(false)}
-            >
-              Fechar
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                setShowConfigModal(false)
-                const nameInput = document.getElementById('name')
-                nameInput?.focus()
-              }}
-            >
-              Criar Conta com E-mail
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -16,13 +16,6 @@ interface AuthContextType {
     password: string
     passwordConfirm: string
   }) => Promise<{ success: boolean; error?: string }>
-  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>
-  isGoogleAuthAvailable: boolean
-  googleConfigDetails: {
-    configured: boolean
-    redirectUri: string
-    backendUrl: string
-  }
   logout: () => void
   refreshUser: () => Promise<void>
   updateProfile: (
@@ -59,32 +52,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<UserProfile | null>(() => mapAuthModelToUser(pb.authStore.model))
   const [token, setToken] = useState<string | null>(pb.authStore.token || null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [isGoogleAuthAvailable, setIsGoogleAuthAvailable] = useState<boolean>(false)
-
-  const backendUrl = pb.baseUrl || ''
-  const redirectUri = backendUrl ? `${backendUrl.replace(/\/$/, '')}/api/oauth2-redirect` : ''
-
-  // Verificar métodos de autenticação disponíveis dinamicamente
-  useEffect(() => {
-    let isMounted = true
-    const checkAuthMethods = async () => {
-      try {
-        const methods = await pb.collection('users').listAuthMethods()
-        if (!isMounted) return
-        const hasGoogle = !!methods?.oauth2?.providers?.some((p: any) => p.name === 'google')
-        setIsGoogleAuthAvailable(hasGoogle)
-      } catch (_) {
-        if (!isMounted) return
-        // Em caso de erro na checagem ou offline, manter false
-        setIsGoogleAuthAvailable(false)
-      }
-    }
-
-    checkAuthMethods()
-    return () => {
-      isMounted = false
-    }
-  }, [])
 
   useEffect(() => {
     const unsub = pb.authStore.onChange((tokenVal, model) => {
@@ -168,61 +135,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }
 
-  const loginWithGoogle = async () => {
-    try {
-      const authData = await pb.collection('users').authWithOAuth2({
-        provider: 'google',
-        urlCallback: (url) => {
-          // Garante abertura da janela sem ser bloqueada por pop-up blocker
-          window.open(url, '_blank', 'width=520,height=620,menubar=no,toolbar=no')
-        },
-      })
-      const profile = mapAuthModelToUser(authData.record)
-      setUser(profile)
-      setToken(authData.token)
-      toast.success('Autenticação com Google concluída!', {
-        description: `Bem-vindo, ${profile?.name || 'usuário'}!`,
-      })
-      return { success: true }
-    } catch (err: any) {
-      const isCancelled =
-        err?.isAbort ||
-        err?.message?.toLowerCase().includes('abort') ||
-        err?.message?.toLowerCase().includes('cancel') ||
-        err?.message?.toLowerCase().includes('closed')
-
-      if (isCancelled) {
-        toast.info('Autenticação cancelada', {
-          description: 'A janela do Google foi fechada antes de concluir.',
-        })
-        return { success: false, error: 'Login cancelado pelo usuário.' }
-      }
-
-      const errStr =
-        `${err?.message || ''} ${err?.response?.message || ''} ${err?.status || ''} ${JSON.stringify(err?.response?.data || {})}`.toLowerCase()
-      const isMissingConfig =
-        err?.status === 400 ||
-        err?.status === 404 ||
-        errStr.includes('missing') ||
-        errStr.includes('not supported') ||
-        errStr.includes('not configured') ||
-        errStr.includes('invalid oauth2 provider') ||
-        errStr.includes('failed to authenticate')
-
-      const friendlyMessage = isMissingConfig
-        ? 'O login com Google está aguardando as chaves Client ID / Secret no painel. Utilize seu e-mail e senha cadastrados.'
-        : err?.response?.message ||
-          err?.message ||
-          'Não foi possível autenticar com o Google. Tente entrar com e-mail e senha.'
-
-      toast.error('Acesso com Google', {
-        description: friendlyMessage,
-        duration: 5500,
-      })
-      return { success: false, error: friendlyMessage }
-    }
-  }
-
   const logout = () => {
     pb.authStore.clear()
     setUser(null)
@@ -290,13 +202,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isLoading,
         login,
         signup,
-        loginWithGoogle,
-        isGoogleAuthAvailable,
-        googleConfigDetails: {
-          configured: isGoogleAuthAvailable,
-          redirectUri,
-          backendUrl,
-        },
         logout,
         refreshUser,
         updateProfile,
