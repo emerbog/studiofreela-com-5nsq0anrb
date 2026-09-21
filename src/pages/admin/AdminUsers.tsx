@@ -17,6 +17,7 @@ import {
   RefreshCw,
   UserCheck,
   Mail,
+  Sparkles,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -76,6 +77,7 @@ export const AdminUsers: React.FC = () => {
       | 'revoke'
       | 'reset_password'
       | 'welcome_email'
+      | 'toggle_pilot'
       | 'delete'
       | 'view'
       | 'change_role'
@@ -177,7 +179,9 @@ export const AdminUsers: React.FC = () => {
     try {
       setIsSubmitting(true)
 
-      if (actionModal.type === 'block') {
+      if (actionModal.type === 'toggle_pilot') {
+        await togglePilotAccess(actionModal.user)
+      } else if (actionModal.type === 'block') {
         await adminService.executeUserAction(actionModal.user.id, 'block', {
           reason: actionModal.reason || 'Bloqueio administrativo',
         })
@@ -361,10 +365,13 @@ export const AdminUsers: React.FC = () => {
                         >
                           {u.plan_tier}
                         </Badge>
-                        {u.pilot_access && (
-                          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0">
-                            Piloto
+                        {u.pilot_access ? (
+                          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0 font-medium flex items-center gap-1">
+                            <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                            Piloto Ativo
                           </Badge>
+                        ) : (
+                          <span className="text-[10px] text-slate-500">Sem Piloto</span>
                         )}
                       </div>{' '}
                     </td>
@@ -403,6 +410,26 @@ export const AdminUsers: React.FC = () => {
 
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {/* Botão de Piloto destacado diretamente na tabela desktop */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => togglePilotAccess(u)}
+                          className={
+                            u.pilot_access
+                              ? 'h-8 px-2 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-950/40 border border-amber-500/30 bg-amber-500/10'
+                              : 'h-8 px-2 text-xs text-slate-300 hover:text-amber-300 hover:bg-slate-800 border border-slate-700/60'
+                          }
+                          title={
+                            u.pilot_access
+                              ? 'Acesso de piloto ativo (clique para revogar)'
+                              : 'Ativar acesso de piloto irrestrito'
+                          }
+                        >
+                          <Sparkles className="w-3.5 h-3.5 mr-1 text-amber-400" />
+                          {u.pilot_access ? 'Piloto Ativo' : 'Tornar Piloto'}
+                        </Button>
+
                         <Button
                           variant="ghost"
                           size="icon"
@@ -511,18 +538,34 @@ export const AdminUsers: React.FC = () => {
                   <span className="capitalize px-2 py-0.5 rounded bg-slate-800 text-[11px] text-slate-300">
                     {u.plan_tier}
                   </span>
-                  {u.pilot_access && (
-                    <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0">
+                  {u.pilot_access ? (
+                    <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0 font-medium flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                       Piloto
                     </Badge>
-                  )}
+                  ) : null}
                   <span>•</span>
                   <span>Papel: {u.role}</span>
                   <span>•</span>
                   <span>{u.counts.clients} clientes</span>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/60">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/60 flex-wrap">
+                  {/* Botão de Piloto direto no card mobile */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => togglePilotAccess(u)}
+                    className={
+                      u.pilot_access
+                        ? 'h-8 text-xs text-amber-400 border-amber-500/40 bg-amber-950/30'
+                        : 'h-8 text-xs text-slate-200 border-slate-700 bg-slate-900 hover:text-amber-400'
+                    }
+                  >
+                    <Sparkles className="w-3.5 h-3.5 mr-1 text-amber-400" />
+                    {u.pilot_access ? 'Revogar Piloto' : 'Ativar Piloto'}
+                  </Button>
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -786,21 +829,26 @@ export const AdminUsers: React.FC = () => {
 
           {/* Toggle Pilot Access */}
           {actionModal.type === 'view' && actionModal.user && (
-            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-              <div>
-                <span className="text-slate-200 font-semibold text-xs block">
-                  Acesso Completo do Piloto
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between bg-slate-950/60 p-3 rounded-lg border border-amber-500/20">
+              <div className="space-y-0.5">
+                <span className="text-amber-400 font-semibold text-xs flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Selo de Acesso de Piloto
                 </span>
                 <span className="text-slate-400 text-[11px] block">
                   {actionModal.user.pilot_access
-                    ? 'Usuário com acesso ilimitado liberado para o teste do piloto.'
-                    : 'Liberar acesso completo e irrestrito sem bloqueio de planos.'}
+                    ? 'Usuário com selo de piloto ativo: recursos ilimitados e proteção contra rebaixamento de cobrança.'
+                    : 'Liberar selo de piloto para acesso completo e irrestrito sem restrições de plano.'}
                 </span>
               </div>
               <Button
                 size="sm"
                 variant={actionModal.user.pilot_access ? 'destructive' : 'default'}
-                className="text-xs h-8"
+                className={
+                  actionModal.user.pilot_access
+                    ? 'text-xs h-8 ml-2'
+                    : 'text-xs h-8 ml-2 bg-amber-600 hover:bg-amber-500 text-slate-950 font-semibold'
+                }
                 onClick={async () => {
                   if (actionModal.user) {
                     await togglePilotAccess(actionModal.user)

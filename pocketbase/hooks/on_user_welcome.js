@@ -28,6 +28,56 @@ onRecordAfterCreateSuccess((e) => {
     return
   }
 
+  // Auto-grant Pilot Access to all new users while pilot period is active
+  // Configured via PILOT_AUTO_GRANT secret/env var (default: true)
+  // To disable after the pilot phase: set PILOT_AUTO_GRANT=false in secrets/env
+  const pilotAutoGrantEnv = ($os.getenv('PILOT_AUTO_GRANT') || '').trim().toLowerCase()
+  const shouldAutoGrantPilot =
+    pilotAutoGrantEnv === '' || pilotAutoGrantEnv === 'true' || pilotAutoGrantEnv === '1'
+
+  if (shouldAutoGrantPilot && !record.getBool('pilot_access')) {
+    try {
+      record.set('pilot_access', true)
+      $app.save(record)
+
+      // Audit log of automatic pilot grant
+      try {
+        const auditCol = $app.findCollectionByNameOrId('admin_audit_logs')
+        const logRec = new Record(auditCol)
+        logRec.set('action', 'pilot_access_auto_granted')
+        logRec.set('target_type', 'user')
+        logRec.set('target_id', userId)
+        logRec.set('admin_email', 'system@studiofreela.com')
+        logRec.set('details', {
+          user_email: userEmail,
+          user_name: rawName,
+          reason: 'Concessão automática de acesso ao piloto no cadastro',
+        })
+        $app.save(logRec)
+      } catch (_) {}
+
+      // In-app pilot welcome notification
+      try {
+        const notifCol = $app.findCollectionByNameOrId('notifications')
+        const pilotNotif = new Record(notifCol)
+        pilotNotif.set('user', userId)
+        pilotNotif.set('title', 'Acesso Completo de Piloto Liberado!')
+        pilotNotif.set(
+          'message',
+          'Olá, ' +
+            firstName +
+            '! Você recebeu o selo de Acesso de Piloto Studio Freela. Todos os módulos estão liberados sem limitações durante o período de piloto.',
+        )
+        pilotNotif.set('type', 'system')
+        pilotNotif.set('read', false)
+        pilotNotif.set('link', '/dashboard')
+        $app.save(pilotNotif)
+      } catch (_) {}
+    } catch (pilotErr) {
+      console.log('Falha ao conceder pilot_access automático:', pilotErr)
+    }
+  }
+
   // Get base site URL
   let siteUrl = $os.getenv('SITE_URL') || 'https://studiofreela.com'
   if (siteUrl.endsWith('/')) siteUrl = siteUrl.slice(0, -1)
