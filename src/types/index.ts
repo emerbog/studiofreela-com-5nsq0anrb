@@ -342,11 +342,33 @@ export type ProfessionalProfileData = {
   updated?: string
 }
 
+export type QualificationLevel = 'basico' | 'intermediario' | 'avancado' | 'especialista'
+
+export type ProfessionalQualification = {
+  id?: string
+  user?: string
+  name: string
+  category?: string
+  level?: QualificationLevel
+  years_experience?: string
+  practical_description?: string
+  certificate_url?: string
+  external_link?: string
+  show_in_public?: boolean
+  show_in_cv?: boolean
+  order?: number
+  created?: string
+  updated?: string
+}
+
 export type ProfessionalExperience = {
   id?: string
   user?: string
   company_client: string
   role: string
+  service_type?: string
+  period_or_year?: string
+  city_state?: string
   start_date?: string
   end_date?: string
   current?: boolean

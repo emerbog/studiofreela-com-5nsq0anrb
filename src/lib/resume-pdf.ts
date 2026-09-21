@@ -3,6 +3,7 @@ import {
   ProfessionalProfileData,
   ProfessionalExperience,
   ProfessionalEducation,
+  ProfessionalQualification,
   ProfessionalService,
   ProfessionalEquipment,
   ResumeBlockConfig,
@@ -25,7 +26,7 @@ export function generateResumePdfFilename(
   const name = profProfile?.commercial_name || user?.name || 'Profissional'
   const cleanName = name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30)
   const dateStr = new Date().toISOString().split('T')[0]
-  return `Curriculo_${cleanName}_StudioFreela_${dateStr}.pdf`
+  return `Apresentacao_Profissional_${cleanName}_StudioFreela_${dateStr}.pdf`
 }
 
 function pdfEscapeText(text: string): string {
@@ -40,8 +41,32 @@ function pdfEscapeText(text: string): string {
   return asciiText
 }
 
+function formatLevelLabel(level?: string): string {
+  switch (level) {
+    case 'basico':
+      return 'Nivel Basico'
+    case 'intermediario':
+      return 'Nivel Intermediario'
+    case 'avancado':
+      return 'Nivel Avancado'
+    case 'especialista':
+      return 'Especialista'
+    default:
+      return level ? `Nivel ${level}` : ''
+  }
+}
+
 /**
- * Constrói o PDF binário canônico PDF-1.4 de 2 páginas de currículo profissional
+ * Constrói o PDF binário canônico PDF-1.4 de Apresentação Profissional
+ * Estrutura ordenada conforme especificação:
+ * 1. Nome e apresentação
+ * 2. Áreas de atuação
+ * 3. Qualificações e conhecimentos específicos
+ * 4. Serviços oferecidos
+ * 5. Últimas empresas onde fez freelance
+ * 6. Equipamentos disponíveis
+ * 7. Contatos profissionais
+ * 8. Data de atualização do perfil
  */
 export function buildResumeBinaryPdfBlob(
   user: UserProfile | null,
@@ -50,6 +75,7 @@ export function buildResumeBinaryPdfBlob(
   education: ProfessionalEducation[],
   services: ProfessionalService[],
   equipment: ProfessionalEquipment[],
+  qualifications: ProfessionalQualification[] = [],
   options: ResumePdfOptions = {},
 ): Blob {
   const isBronze = options.theme !== 'bw'
@@ -60,7 +86,7 @@ export function buildResumeBinaryPdfBlob(
   const boxBgRg = isBronze ? '0.98 0.96 0.93' : '0.96 0.96 0.96'
   const boxBorderRg = isBronze ? '0.88 0.78 0.68' : '0.80 0.80 0.80'
 
-  const displayName = profile?.commercial_name || user?.name || 'Profissional Autônomo'
+  const displayName = profile?.commercial_name || user?.name || 'Profissional Autonomo'
   const title = profile?.professional_title || user?.profession || 'Especialista Freelancer'
   const headline = profile?.headline || ''
   const bio = profile?.bio || ''
@@ -69,43 +95,53 @@ export function buildResumeBinaryPdfBlob(
   const city = profile?.city || ''
   const state = profile?.state || ''
   const locationStr = [city, state].filter(Boolean).join(' - ') || 'Brasil'
-  const regions = profile?.served_regions ? `Regiões: ${profile.served_regions}` : ''
+  const regions = profile?.served_regions ? `Regioes: ${profile.served_regions}` : ''
   const workModeStr =
     profile?.work_mode === 'presencial'
       ? 'Presencial'
       : profile?.work_mode === 'remoto'
         ? 'Remoto'
         : profile?.work_mode === 'hibrido'
-          ? 'Híbrido'
+          ? 'Hibrido'
           : ''
   const yearsExp =
     profile?.years_experience !== undefined && profile.years_experience > 0
-      ? `${profile.years_experience} anos de exp.`
+      ? `${profile.years_experience} anos de experiencia`
       : ''
-  const travelStr = profile?.travel_availability ? 'Disponível p/ viagens' : ''
+  const travelStr = profile?.travel_availability ? 'Disponivel para viagens' : ''
   const languagesList = Array.isArray(profile?.languages) ? profile.languages.join(', ') : ''
 
-  const visibleExp = experiences.filter((e) => e.show_in_cv !== false)
-  const visibleEdu = education.filter((e) => e.show_in_cv !== false)
+  // Filtragem de visibilidade
+  const visibleQual = qualifications.filter((q) => q.show_in_cv !== false)
   const visibleSrv = services.filter((s) => s.show_in_cv !== false)
+  const visibleExp = experiences.filter((e) => e.show_in_cv !== false)
   const visibleEq = equipment.filter((eq) => eq.show_in_cv !== false)
+  const visibleEdu = education.filter((e) => e.show_in_cv !== false)
 
   const updatedDateStr = formatShortDate(new Date().toISOString())
 
-  // -------------------------------------------------------------
-  // PÁGINA 1: Identificação, Resumo, Serviços e Experiências
-  // -------------------------------------------------------------
+  // =============================================================
+  // PÁGINA 1
+  // =============================================================
   const streamPage1: string[] = [
     'q',
     // Barra superior
     `${primaryColorRg} rg`,
     '40 804 515 4 re f',
 
-    // Nome
+    // Título do documento
+    'BT',
+    '/F2 8 Tf',
+    `${accentColorRg} rg`,
+    '40 792 Td',
+    '(APRESENTACAO PROFISSIONAL - STUDIO FREELA) Tj',
+    'ET',
+
+    // 1. Nome e Apresentação
     'BT',
     '/F2 16 Tf',
     `${primaryColorRg} rg`,
-    '40 782 Td',
+    '40 774 Td',
     `(${pdfEscapeText(displayName.toUpperCase())}) Tj`,
     'ET',
 
@@ -113,25 +149,25 @@ export function buildResumeBinaryPdfBlob(
     'BT',
     '/F2 10 Tf',
     `${accentColorRg} rg`,
-    '40 768 Td',
+    '40 760 Td',
     `(${pdfEscapeText(title)}) Tj`,
     'ET',
 
-    // Contatos e localização (uma linha limpa)
+    // Contatos limpos e localização padrão Cidade/UF
     'BT',
     '/F1 8.5 Tf',
     '0.3 0.3 0.3 rg',
-    '40 754 Td',
+    '40 746 Td',
     `(${pdfEscapeText([locationStr, email, phone].filter(Boolean).join(' | '))}) Tj`,
     'ET',
 
     // Linha divisória
     '0.85 0.85 0.85 RG',
     '1 w',
-    '40 744 m 555 744 l S',
+    '40 736 m 555 736 l S',
   ]
 
-  let curY = 730
+  let curY = 724
 
   // Headline / Frase de destaque se houver
   if (headline) {
@@ -150,19 +186,18 @@ export function buildResumeBinaryPdfBlob(
     curY -= 28
   }
 
-  // 1. Resumo Profissional / Biografia
+  // Descrição curta / Biografia
   if (bio) {
     streamPage1.push(
       'BT',
       '/F2 9.5 Tf',
       `${primaryColorRg} rg`,
       `40 ${curY} Td`,
-      '(RESUMO PROFISSIONAL) Tj',
+      '(1. APRESENTACAO & PERFIL) Tj',
       'ET',
     )
     curY -= 12
 
-    // Quebra bio em fatias curtas
     const bioLines: string[] = []
     const words = bio.split(' ')
     let currentLine = ''
@@ -188,10 +223,10 @@ export function buildResumeBinaryPdfBlob(
       )
       curY -= 11
     }
-    curY -= 6
+    curY -= 4
   }
 
-  // Tags informativas: anos de exp, modalidade, viagens, idiomas
+  // 2. Áreas de Atuação
   const metaTags = [
     yearsExp,
     workModeStr,
@@ -205,29 +240,86 @@ export function buildResumeBinaryPdfBlob(
   if (metaTags) {
     streamPage1.push(
       'BT',
-      '/F1 7.5 Tf',
-      '0.4 0.4 0.4 rg',
+      '/F2 9.5 Tf',
+      `${primaryColorRg} rg`,
       `40 ${curY} Td`,
+      '(2. AREAS DE ATUACAO & DISPONIBILIDADE) Tj',
+      'ET',
+      'BT',
+      '/F1 8 Tf',
+      '0.3 0.3 0.3 rg',
+      `40 ${curY - 12} Td`,
       `(${pdfEscapeText(metaTags)}) Tj`,
       'ET',
     )
-    curY -= 16
+    curY -= 24
   }
 
-  // 2. Serviços e Especialidades
+  // 3. Qualificações e Conhecimentos Específicos
+  if (visibleQual.length > 0) {
+    streamPage1.push(
+      'BT',
+      '/F2 9.5 Tf',
+      `${primaryColorRg} rg`,
+      `40 ${curY} Td`,
+      '(3. QUALIFICACOES E CONHECIMENTOS ESPECIFICOS) Tj',
+      'ET',
+    )
+    curY -= 13
+
+    const maxQual = Math.min(visibleQual.length, 5)
+    for (let i = 0; i < maxQual; i++) {
+      const q = visibleQual[i]
+      const levelLabel = formatLevelLabel(q.level)
+      const details = [levelLabel, q.years_experience ? `${q.years_experience}` : '', q.category]
+        .filter(Boolean)
+        .join(' • ')
+
+      streamPage1.push(
+        '0.95 0.95 0.95 RG',
+        `40 ${curY - 3} m 555 ${curY - 3} l S`,
+        'BT',
+        '/F2 8.5 Tf',
+        '0.15 0.15 0.15 rg',
+        `44 ${curY} Td`,
+        `(${pdfEscapeText(q.name.slice(0, 45))}) Tj`,
+        '/F2 7.5 Tf',
+        `${accentColorRg} rg`,
+        `330 ${curY} Td`,
+        `(${pdfEscapeText(details.slice(0, 42))}) Tj`,
+        'ET',
+      )
+      curY -= 12
+
+      if (q.practical_description) {
+        streamPage1.push(
+          'BT',
+          '/F1 7.5 Tf',
+          '0.35 0.35 0.35 rg',
+          `48 ${curY} Td`,
+          `(${pdfEscapeText(q.practical_description.slice(0, 110))}) Tj`,
+          'ET',
+        )
+        curY -= 10
+      }
+      curY -= 2
+    }
+    curY -= 6
+  }
+
+  // 4. Serviços Oferecidos
   if (visibleSrv.length > 0) {
     streamPage1.push(
       'BT',
       '/F2 9.5 Tf',
       `${primaryColorRg} rg`,
       `40 ${curY} Td`,
-      '(SERVICOS & ESPECIALIDADES) Tj',
+      '(4. SERVICOS OFERECIDOS) Tj',
       'ET',
     )
-    curY -= 12
+    curY -= 13
 
-    // Tabela resumida de serviços
-    const maxServices = Math.min(visibleSrv.length, 5)
+    const maxServices = Math.min(visibleSrv.length, 4)
     for (let i = 0; i < maxServices; i++) {
       const s = visibleSrv[i]
       const priceText =
@@ -245,78 +337,18 @@ export function buildResumeBinaryPdfBlob(
         '/F2 8 Tf',
         '0.15 0.15 0.15 rg',
         `44 ${curY} Td`,
-        `(${pdfEscapeText(s.name.slice(0, 40))}) Tj`,
+        `(${pdfEscapeText(s.name.slice(0, 38))}) Tj`,
         '/F1 7.5 Tf',
         '0.45 0.45 0.45 rg',
         `240 ${curY} Td`,
-        `(${pdfEscapeText((s.short_description || s.category || '').slice(0, 45))}) Tj`,
+        `(${pdfEscapeText((s.short_description || s.category || '').slice(0, 42))}) Tj`,
         '/F2 7.5 Tf',
         `${accentColorRg} rg`,
-        `450 ${curY} Td`,
+        `440 ${curY} Td`,
         `(${pdfEscapeText(`${priceText} ${unitText}`)}) Tj`,
         'ET',
       )
       curY -= 14
-    }
-    curY -= 8
-  }
-
-  // 3. Experiência Profissional
-  if (visibleExp.length > 0) {
-    streamPage1.push(
-      'BT',
-      '/F2 9.5 Tf',
-      `${primaryColorRg} rg`,
-      `40 ${curY} Td`,
-      '(EXPERIENCIA PROFISSIONAL) Tj',
-      'ET',
-    )
-    curY -= 14
-
-    const maxExp = Math.min(visibleExp.length, 4)
-    for (let i = 0; i < maxExp; i++) {
-      const exp = visibleExp[i]
-      const period = exp.current
-        ? `${exp.start_date || ''} - Atual`
-        : [exp.start_date, exp.end_date].filter(Boolean).join(' - ')
-
-      streamPage1.push(
-        'BT',
-        '/F2 8.5 Tf',
-        '0.15 0.15 0.15 rg',
-        `40 ${curY} Td`,
-        `(${pdfEscapeText(`${exp.role} • ${exp.company_client}`)}) Tj`,
-        '/F1 7.5 Tf',
-        '0.45 0.45 0.45 rg',
-        `430 ${curY} Td`,
-        `(${pdfEscapeText(period || exp.location_or_mode || '')}) Tj`,
-        'ET',
-      )
-      curY -= 11
-
-      if (exp.description) {
-        streamPage1.push(
-          'BT',
-          '/F1 7.5 Tf',
-          '0.3 0.3 0.3 rg',
-          `48 ${curY} Td`,
-          `(${pdfEscapeText(exp.description.slice(0, 110))}) Tj`,
-          'ET',
-        )
-        curY -= 10
-      }
-      if (exp.results_projects) {
-        streamPage1.push(
-          'BT',
-          '/F1 7 Tf',
-          `${accentColorRg} rg`,
-          `48 ${curY} Td`,
-          `(${pdfEscapeText(`Destaque: ${exp.results_projects.slice(0, 100)}`)}) Tj`,
-          'ET',
-        )
-        curY -= 10
-      }
-      curY -= 4
     }
   }
 
@@ -328,24 +360,24 @@ export function buildResumeBinaryPdfBlob(
     '/F1 7.5 Tf',
     '0.5 0.5 0.5 rg',
     '40 34 Td',
-    `(${pdfEscapeText(`Studio Freela • Curriculo Profissional • ${displayName} • Pagina 1 de 2 • Continua na pagina 2`)}) Tj`,
+    `(${pdfEscapeText(`Apresentacao Profissional - Studio Freela • ${displayName} • Pagina 1 de 2 • Continua na pagina 2`)}) Tj`,
     'ET',
     'Q',
   )
 
-  // -------------------------------------------------------------
-  // PÁGINA 2: Formação, Equipamentos para Locação, Links e Observações
-  // -------------------------------------------------------------
+  // =============================================================
+  // PÁGINA 2
+  // =============================================================
   const streamPage2: string[] = [
     'q',
     `${primaryColorRg} rg`,
     '40 804 515 4 re f',
 
     'BT',
-    '/F2 12 Tf',
+    '/F2 11 Tf',
     `${primaryColorRg} rg`,
     '40 782 Td',
-    `(${pdfEscapeText(`${displayName.toUpperCase()} - FORMAÇÃO, EQUIPAMENTOS & CONTATOS`)}) Tj`,
+    `(${pdfEscapeText(`${displayName.toUpperCase()} - EXPERIENCIAS FREELANCE, EQUIPAMENTOS & CONTATOS`)}) Tj`,
     'ET',
 
     '0.85 0.85 0.85 RG',
@@ -355,64 +387,83 @@ export function buildResumeBinaryPdfBlob(
 
   let curY2 = 752
 
-  // 4. Formação Acadêmica, Cursos & Certificações
-  if (visibleEdu.length > 0) {
+  // 5. Últimas Empresas Onde Fiz Freelance
+  if (visibleExp.length > 0) {
     streamPage2.push(
       'BT',
       '/F2 9.5 Tf',
       `${primaryColorRg} rg`,
       `40 ${curY2} Td`,
-      '(FORMACAO ACADEMICA & CERTIFICACOES) Tj',
+      '(5. ULTIMAS EMPRESAS ONDE FIZ FREELANCE) Tj',
       'ET',
     )
-    curY2 -= 14
+    curY2 -= 13
 
-    const maxEdu = Math.min(visibleEdu.length, 5)
-    for (let i = 0; i < maxEdu; i++) {
-      const ed = visibleEdu[i]
+    const maxExp = Math.min(visibleExp.length, 4)
+    for (let i = 0; i < maxExp; i++) {
+      const exp = visibleExp[i]
+      const period =
+        exp.period_or_year ||
+        (exp.current
+          ? `${exp.start_date || ''} - Atual`
+          : [exp.start_date, exp.end_date].filter(Boolean).join(' - '))
+      const location = exp.city_state || exp.location_or_mode || ''
+      const roleAndCompany = `${exp.role} • ${exp.company_client}`
+
       streamPage2.push(
         'BT',
         '/F2 8.5 Tf',
         '0.15 0.15 0.15 rg',
         `40 ${curY2} Td`,
-        `(${pdfEscapeText(`${ed.course_name} • ${ed.institution}`)}) Tj`,
+        `(${pdfEscapeText(roleAndCompany.slice(0, 50))}) Tj`,
         '/F1 7.5 Tf',
         '0.45 0.45 0.45 rg',
-        `440 ${curY2} Td`,
-        `(${pdfEscapeText(ed.period_or_year || '')}) Tj`,
+        `430 ${curY2} Td`,
+        `(${pdfEscapeText([period, location].filter(Boolean).join(' | ').slice(0, 30))}) Tj`,
         'ET',
       )
       curY2 -= 11
 
-      if (ed.certificate_url) {
+      if (exp.service_type) {
         streamPage2.push(
           'BT',
-          '/F1 7 Tf',
+          '/F2 7.5 Tf',
           `${accentColorRg} rg`,
           `48 ${curY2} Td`,
-          `(${pdfEscapeText(`Certificado/Link: ${ed.certificate_url.slice(0, 90)}`)}) Tj`,
+          `(${pdfEscapeText(`Servico realizado: ${exp.service_type}`)}) Tj`,
           'ET',
         )
-        curY2 -= 9
+        curY2 -= 10
       }
-      curY2 -= 3
+
+      if (exp.description) {
+        streamPage2.push(
+          'BT',
+          '/F1 7.5 Tf',
+          '0.3 0.3 0.3 rg',
+          `48 ${curY2} Td`,
+          `(${pdfEscapeText(exp.description.slice(0, 110))}) Tj`,
+          'ET',
+        )
+        curY2 -= 10
+      }
+      curY2 -= 4
     }
-    curY2 -= 8
+    curY2 -= 6
   }
 
-  // 5. Equipamentos Disponíveis para Locação
+  // 6. Equipamentos Disponíveis para Locação
   if (visibleEq.length > 0) {
     streamPage2.push(
       'BT',
       '/F2 9.5 Tf',
       `${primaryColorRg} rg`,
       `40 ${curY2} Td`,
-      '(EQUIPAMENTOS PROPRIOS DISPONIVEIS PARA LOCACAO) Tj',
+      '(6. EQUIPAMENTOS PROPRIOS DISPONIVEIS PARA LOCACAO) Tj',
       'ET',
     )
-    curY2 -= 14
+    curY2 -= 13
 
-    // Cabeçalho da tabela de equipamentos
     streamPage2.push(
       `${boxBgRg} rg`,
       `40 ${curY2 - 3} 515 14 re f`,
@@ -431,7 +482,7 @@ export function buildResumeBinaryPdfBlob(
     )
     curY2 -= 15
 
-    const maxEq = Math.min(visibleEq.length, 6)
+    const maxEq = Math.min(visibleEq.length, 5)
     for (let i = 0; i < maxEq; i++) {
       const eq = visibleEq[i]
       const nameAndBrand = [eq.name, eq.brand, eq.model].filter(Boolean).join(' ')
@@ -464,10 +515,38 @@ export function buildResumeBinaryPdfBlob(
       )
       curY2 -= 14
     }
-    curY2 -= 10
+    curY2 -= 8
   }
 
-  // 6. Canais Profissionais e Links
+  // Formações / Certificações complementares se houver espaço
+  if (visibleEdu.length > 0 && curY2 > 260) {
+    streamPage2.push(
+      'BT',
+      '/F2 9 Tf',
+      `${primaryColorRg} rg`,
+      `40 ${curY2} Td`,
+      '(CURSOS & CERTIFICACOES COMPLEMENTARES) Tj',
+      'ET',
+    )
+    curY2 -= 12
+
+    const maxEdu = Math.min(visibleEdu.length, 3)
+    for (let i = 0; i < maxEdu; i++) {
+      const ed = visibleEdu[i]
+      streamPage2.push(
+        'BT',
+        '/F1 8 Tf',
+        '0.2 0.2 0.2 rg',
+        `44 ${curY2} Td`,
+        `(${pdfEscapeText(`${ed.course_name} - ${ed.institution}${ed.period_or_year ? ` (${ed.period_or_year})` : ''}`)}) Tj`,
+        'ET',
+      )
+      curY2 -= 11
+    }
+    curY2 -= 6
+  }
+
+  // 7. Contatos Profissionais
   const social = profile?.social_links || {}
   const linksList = [
     social.website ? `Site: ${social.website}` : '',
@@ -482,16 +561,16 @@ export function buildResumeBinaryPdfBlob(
     '/F2 9.5 Tf',
     `${primaryColorRg} rg`,
     `40 ${curY2} Td`,
-    '(CANAIS DE CONTATO & LINKS PROFISSIONAIS) Tj',
+    '(7. CONTATOS PROFISSIONAIS & CANAIS OFICIAIS) Tj',
     'ET',
   )
   curY2 -= 14
 
   streamPage2.push(
     `${boxBgRg} rg`,
-    `40 ${curY2 - 28} 515 36 re f`,
+    `40 ${curY2 - 26} 515 34 re f`,
     `${boxBorderRg} RG`,
-    `40 ${curY2 - 28} 515 36 re S`,
+    `40 ${curY2 - 26} 515 34 re S`,
     'BT',
     '/F1 8 Tf',
     '0.2 0.2 0.2 rg',
@@ -505,35 +584,35 @@ export function buildResumeBinaryPdfBlob(
       'BT',
       '/F1 7.5 Tf',
       `${accentColorRg} rg`,
-      `48 ${curY2 - 18} Td`,
+      `48 ${curY2 - 17} Td`,
       `(${pdfEscapeText(linksList.slice(0, 3).join('   •   '))}) Tj`,
       'ET',
     )
   }
-  curY2 -= 46
+  curY2 -= 44
 
-  // 7. Observações Comerciais & Privacidade
+  // Condições e privacidade
   streamPage2.push(
     '0.97 0.97 0.97 rg',
-    `40 ${curY2 - 24} 515 30 re f`,
+    `40 ${curY2 - 24} 515 28 re f`,
     '0.90 0.90 0.90 RG',
-    `40 ${curY2 - 24} 515 30 re S`,
+    `40 ${curY2 - 24} 515 28 re S`,
     'BT',
     '/F2 7.5 Tf',
     '0.3 0.3 0.3 rg',
     `48 ${curY2 - 8} Td`,
-    '(CONDICOES COMERCIAIS & NOTA DE PRIVACIDADE) Tj',
+    '(CONDICOES COMERCIAIS & PRIVACIDADE) Tj',
     'ET',
     'BT',
     '/F1 7 Tf',
     '0.4 0.4 0.4 rg',
     `48 ${curY2 - 18} Td`,
-    '(Valores e condicoes informados sujeitos a confirmacao em proposta formal. Documento emitido sem exposicao de dados sigilosos.) Tj',
+    '(Valores e condicoes sujeitos a confirmacao em proposta formal. Documento emitido sem exposicao de dados sigilosos.) Tj',
     'ET',
   )
 
-  // Data de atualização no rodapé
-  const footerDate = showDate ? ` • Atualizado em ${updatedDateStr}` : ''
+  // 8. Data de atualização do perfil no rodapé
+  const footerDate = showDate ? ` • 8. Atualizado em ${updatedDateStr}` : ''
 
   // Rodapé da Página 2
   streamPage2.push(
@@ -543,7 +622,7 @@ export function buildResumeBinaryPdfBlob(
     '/F1 7.5 Tf',
     '0.5 0.5 0.5 rg',
     '40 34 Td',
-    `(${pdfEscapeText(`Studio Freela (studiofreela.com) • Curriculo Profissional • Pagina 2 de 2${footerDate}`)}) Tj`,
+    `(${pdfEscapeText(`Apresentacao Profissional - Studio Freela (studiofreela.com) • Pagina 2 de 2${footerDate}`)}) Tj`,
     'ET',
     'Q',
   )
@@ -602,7 +681,7 @@ export function buildResumeBinaryPdfBlob(
 }
 
 /**
- * Baixa diretamente o arquivo PDF de currículo
+ * Baixa diretamente o arquivo PDF de Apresentação Profissional
  */
 export function downloadResumeBinaryPdf(
   user: UserProfile | null,
@@ -611,6 +690,7 @@ export function downloadResumeBinaryPdf(
   education: ProfessionalEducation[],
   services: ProfessionalService[],
   equipment: ProfessionalEquipment[],
+  qualifications: ProfessionalQualification[] = [],
   options: ResumePdfOptions = {},
 ) {
   try {
@@ -621,6 +701,7 @@ export function downloadResumeBinaryPdf(
       education,
       services,
       equipment,
+      qualifications,
       options,
     )
     const filename = generateResumePdfFilename(user, profile)
@@ -632,17 +713,16 @@ export function downloadResumeBinaryPdf(
     link.click()
     document.body.removeChild(link)
     setTimeout(() => URL.revokeObjectURL(url), 2000)
-    toast.success('Currículo em PDF baixado com sucesso!')
+    toast.success('Apresentação profissional em PDF baixada com sucesso!')
 
-    // Instrument usage event
     import('@/services/adminService')
       .then(({ adminService }) => {
         adminService.logUsageEvent('resume_generated', { user_id: user?.id })
       })
       .catch(() => {})
   } catch (err: any) {
-    console.error('Erro ao gerar PDF do currículo:', err)
-    toast.error('Erro ao gerar arquivo PDF do currículo.')
+    console.error('Erro ao gerar PDF da apresentação profissional:', err)
+    toast.error('Erro ao gerar arquivo PDF.')
   }
 }
 
@@ -656,6 +736,7 @@ export function openResumePdfInNewTab(
   education: ProfessionalEducation[],
   services: ProfessionalService[],
   equipment: ProfessionalEquipment[],
+  qualifications: ProfessionalQualification[] = [],
   options: ResumePdfOptions = {},
 ) {
   try {
@@ -666,6 +747,7 @@ export function openResumePdfInNewTab(
       education,
       services,
       equipment,
+      qualifications,
       options,
     )
     const url = URL.createObjectURL(blob)
@@ -686,6 +768,7 @@ export async function shareResumePdfFile(
   education: ProfessionalEducation[],
   services: ProfessionalService[],
   equipment: ProfessionalEquipment[],
+  qualifications: ProfessionalQualification[] = [],
   options: ResumePdfOptions = {},
 ) {
   const filename = generateResumePdfFilename(user, profile)
@@ -696,6 +779,7 @@ export async function shareResumePdfFile(
     education,
     services,
     equipment,
+    qualifications,
     options,
   )
   const file = new File([blob], filename, { type: 'application/pdf' })
@@ -704,10 +788,10 @@ export async function shareResumePdfFile(
     try {
       await navigator.share({
         files: [file],
-        title: `Currículo Profissional - ${profile?.commercial_name || user?.name || 'Studio Freela'}`,
-        text: `Apresento meu currículo profissional e portfólio de serviços.`,
+        title: `Apresentação Profissional - ${profile?.commercial_name || user?.name || 'Studio Freela'}`,
+        text: `Apresento minha qualificação profissional e portfólio de serviços freelance.`,
       })
-      toast.success('Currículo compartilhado com sucesso!')
+      toast.success('Apresentação profissional compartilhada com sucesso!')
       return
     } catch (err: any) {
       if (err.name === 'AbortError') return
@@ -716,7 +800,16 @@ export async function shareResumePdfFile(
   }
 
   // Fallback: download direto
-  downloadResumeBinaryPdf(user, profile, experiences, education, services, equipment, options)
+  downloadResumeBinaryPdf(
+    user,
+    profile,
+    experiences,
+    education,
+    services,
+    equipment,
+    qualifications,
+    options,
+  )
   toast.info(
     'Compartilhamento nativo de arquivo indisponível neste navegador. O PDF foi baixado diretamente.',
   )

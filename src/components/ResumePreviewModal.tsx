@@ -13,9 +13,9 @@ import {
   ProfessionalProfileData,
   ProfessionalExperience,
   ProfessionalEducation,
+  ProfessionalQualification,
   ProfessionalService,
   ProfessionalEquipment,
-  ResumeBlockConfig,
 } from '@/types'
 import { formatCurrency, formatShortDate } from '@/lib/formatters'
 import {
@@ -25,15 +25,12 @@ import {
   MapPin,
   Mail,
   Phone,
-  Globe,
-  Instagram,
-  Linkedin,
-  Calendar,
-  Briefcase,
-  GraduationCap,
-  Wrench,
-  Sparkles,
   Eye,
+  Award,
+  Briefcase,
+  Layers,
+  Wrench,
+  GraduationCap,
 } from 'lucide-react'
 import {
   downloadResumeBinaryPdf,
@@ -51,6 +48,7 @@ interface ResumePreviewModalProps {
   education: ProfessionalEducation[]
   services: ProfessionalService[]
   equipment: ProfessionalEquipment[]
+  qualifications?: ProfessionalQualification[]
   theme: ResumePdfTheme
   onThemeChange: (t: ResumePdfTheme) => void
 }
@@ -64,6 +62,7 @@ export function ResumePreviewModal({
   education,
   services,
   equipment,
+  qualifications = [],
   theme,
   onThemeChange,
 }: ResumePreviewModalProps) {
@@ -75,27 +74,46 @@ export function ResumePreviewModal({
   const email = profile?.professional_email || user?.email
   const location = [profile?.city, profile?.state].filter(Boolean).join(' - ')
 
+  const visibleQual = qualifications.filter((q) => q.show_in_cv !== false)
   const visibleExp = experiences.filter((e) => e.show_in_cv !== false)
   const visibleEdu = education.filter((e) => e.show_in_cv !== false)
   const visibleSrv = services.filter((s) => s.show_in_cv !== false)
   const visibleEq = equipment.filter((eq) => eq.show_in_cv !== false)
 
   const handleDownload = () => {
-    downloadResumeBinaryPdf(user, profile, experiences, education, services, equipment, {
-      theme,
-      showUpdatedAt: profile?.show_updated_at_in_cv ?? true,
-    })
+    downloadResumeBinaryPdf(
+      user,
+      profile,
+      experiences,
+      education,
+      services,
+      equipment,
+      qualifications,
+      {
+        theme,
+        showUpdatedAt: profile?.show_updated_at_in_cv ?? true,
+      },
+    )
   }
 
   const handlePrint = () => {
-    openResumePdfInNewTab(user, profile, experiences, education, services, equipment, {
-      theme,
-      showUpdatedAt: profile?.show_updated_at_in_cv ?? true,
-    })
+    openResumePdfInNewTab(
+      user,
+      profile,
+      experiences,
+      education,
+      services,
+      equipment,
+      qualifications,
+      {
+        theme,
+        showUpdatedAt: profile?.show_updated_at_in_cv ?? true,
+      },
+    )
   }
 
   const handleShare = () => {
-    shareResumePdfFile(user, profile, experiences, education, services, equipment, {
+    shareResumePdfFile(user, profile, experiences, education, services, equipment, qualifications, {
       theme,
       showUpdatedAt: profile?.show_updated_at_in_cv ?? true,
     })
@@ -107,10 +125,10 @@ export function ResumePreviewModal({
         <DialogHeader className="p-4 border-b border-border/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-muted/20">
           <div>
             <DialogTitle className="font-serif text-lg flex items-center gap-2">
-              <Eye className="w-5 h-5 text-primary" /> Prévia do Currículo Profissional
+              <Eye className="w-5 h-5 text-primary" /> Prévia da Apresentação Profissional
             </DialogTitle>
             <p className="text-xs text-muted-foreground">
-              Revise o layout antes de baixar em PDF ou imprimir.
+              Apresentação oficial de qualificações, áreas de atuação e serviços freelance.
             </p>
           </div>
 
@@ -139,7 +157,7 @@ export function ResumePreviewModal({
           </div>
         </DialogHeader>
 
-        {/* Folha de Currículo Estilizada simulando folha A4 */}
+        {/* Folha Estilizada simulando folha A4 */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-muted/40">
           <div
             className={`max-w-2xl mx-auto bg-background p-6 sm:p-8 rounded-lg shadow-md border ${
@@ -153,9 +171,12 @@ export function ResumePreviewModal({
               }`}
             />
 
-            {/* Cabeçalho */}
+            {/* 1. Nome e Apresentação Profissional */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-border/60">
               <div className="space-y-1">
+                <span className="text-[10px] font-semibold tracking-wider uppercase text-muted-foreground">
+                  Apresentação Profissional — Studio Freela
+                </span>
                 <h2 className="text-2xl font-serif font-bold tracking-tight text-foreground">
                   {displayName}
                 </h2>
@@ -209,7 +230,7 @@ export function ResumePreviewModal({
                 <h3
                   className={`text-xs font-bold uppercase tracking-wider ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
                 >
-                  Resumo Profissional
+                  Apresentação & Perfil
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
                   {profile.bio}
@@ -217,13 +238,73 @@ export function ResumePreviewModal({
               </div>
             )}
 
-            {/* Serviços */}
+            {/* 2. Áreas de Atuação */}
+            {(profile?.served_regions ||
+              profile?.languages?.length ||
+              profile?.years_experience) && (
+              <div className="p-2.5 rounded border border-border/50 bg-muted/20 text-xs space-y-1">
+                <span className="font-semibold text-foreground">
+                  2. Áreas de Atuação & Disponibilidade:
+                </span>
+                <p className="text-[11px] text-muted-foreground">
+                  {[
+                    profile?.years_experience
+                      ? `${profile.years_experience} anos de experiência prática`
+                      : '',
+                    profile?.work_mode ? `Atendimento ${profile.work_mode}` : '',
+                    profile?.travel_availability ? 'Disponível para viagens' : '',
+                    profile?.served_regions ? `Regiões: ${profile.served_regions}` : '',
+                    profile?.languages?.length ? `Idiomas: ${profile.languages.join(', ')}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' • ')}
+                </p>
+              </div>
+            )}
+
+            {/* 3. Qualificações e Conhecimentos Específicos */}
+            {visibleQual.length > 0 && (
+              <div className="space-y-2">
+                <h3
+                  className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
+                >
+                  <Award className="w-3.5 h-3.5" /> 3. Qualificações e Conhecimentos Específicos
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {visibleQual.map((qual, idx) => (
+                    <div
+                      key={qual.id || idx}
+                      className="p-2.5 rounded border border-border/50 bg-muted/20 space-y-0.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-foreground">{qual.name}</p>
+                        {qual.level && (
+                          <Badge variant="outline" className="text-[10px] capitalize py-0">
+                            {qual.level}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        {[qual.category, qual.years_experience].filter(Boolean).join(' • ')}
+                      </p>
+                      {qual.practical_description && (
+                        <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1">
+                          {qual.practical_description}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 4. Serviços Oferecidos */}
             {visibleSrv.length > 0 && (
               <div className="space-y-2">
                 <h3
-                  className={`text-xs font-bold uppercase tracking-wider ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
+                  className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
                 >
-                  Serviços & Especialidades
+                  <Layers className="w-3.5 h-3.5" /> 4. Serviços Oferecidos
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   {visibleSrv.map((srv, idx) => (
@@ -252,15 +333,15 @@ export function ResumePreviewModal({
               </div>
             )}
 
-            {/* Experiências */}
+            {/* 5. Últimas Empresas Onde Fiz Freelance */}
             {visibleExp.length > 0 && (
               <div className="space-y-2">
                 <h3
-                  className={`text-xs font-bold uppercase tracking-wider ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
+                  className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
                 >
-                  Experiência Profissional
+                  <Briefcase className="w-3.5 h-3.5" /> 5. Últimas Empresas Onde Fiz Freelance
                 </h3>
-                <div className="space-y-2.5 text-xs">
+                <div className="space-y-2 text-xs">
                   {visibleExp.map((exp, idx) => (
                     <div
                       key={exp.id || idx}
@@ -271,63 +352,37 @@ export function ResumePreviewModal({
                           {exp.role} • {exp.company_client}
                         </span>
                         <span className="text-[11px] text-muted-foreground">
-                          {exp.current
-                            ? `${exp.start_date || ''} - Atual`
-                            : [exp.start_date, exp.end_date].filter(Boolean).join(' - ')}
+                          {exp.period_or_year ||
+                            (exp.current
+                              ? `${exp.start_date || ''} - Atual`
+                              : [exp.start_date, exp.end_date].filter(Boolean).join(' - '))}
                         </span>
                       </div>
+                      {exp.service_type && (
+                        <p
+                          className={`text-[11px] font-medium ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
+                        >
+                          Tipo de serviço: {exp.service_type}
+                        </p>
+                      )}
                       {exp.description && (
                         <p className="text-[11px] text-muted-foreground leading-normal">
                           {exp.description}
                         </p>
                       )}
-                      {exp.results_projects && (
-                        <p
-                          className={`text-[11px] font-medium ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
-                        >
-                          Destaque: {exp.results_projects}
-                        </p>
-                      )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Formação */}
-            {visibleEdu.length > 0 && (
-              <div className="space-y-2">
-                <h3
-                  className={`text-xs font-bold uppercase tracking-wider ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
-                >
-                  Formação Acadêmica & Cursos
-                </h3>
-                <div className="space-y-2 text-xs">
-                  {visibleEdu.map((edu, idx) => (
-                    <div
-                      key={edu.id || idx}
-                      className="flex justify-between items-start border-b border-border/30 pb-1.5"
-                    >
-                      <div>
-                        <p className="font-semibold text-foreground">{edu.course_name}</p>
-                        <p className="text-[11px] text-muted-foreground">{edu.institution}</p>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground">
-                        {edu.period_or_year}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Equipamentos */}
+            {/* 6. Equipamentos Disponíveis */}
             {visibleEq.length > 0 && (
               <div className="space-y-2">
                 <h3
-                  className={`text-xs font-bold uppercase tracking-wider ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
+                  className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
                 >
-                  Equipamentos Disponíveis para Locação
+                  <Wrench className="w-3.5 h-3.5" /> 6. Equipamentos Disponíveis para Locação
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   {visibleEq.map((eq, idx) => (
@@ -355,12 +410,39 @@ export function ResumePreviewModal({
               </div>
             )}
 
-            {/* Rodapé da prévia */}
+            {/* Cursos & Certificações */}
+            {visibleEdu.length > 0 && (
+              <div className="space-y-2">
+                <h3
+                  className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isBronze ? 'text-[#b07d4f]' : 'text-foreground'}`}
+                >
+                  <GraduationCap className="w-3.5 h-3.5" /> Cursos & Certificações
+                </h3>
+                <div className="space-y-1.5 text-xs">
+                  {visibleEdu.map((edu, idx) => (
+                    <div
+                      key={edu.id || idx}
+                      className="flex justify-between items-start border-b border-border/30 pb-1"
+                    >
+                      <div>
+                        <p className="font-semibold text-foreground">{edu.course_name}</p>
+                        <p className="text-[11px] text-muted-foreground">{edu.institution}</p>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">
+                        {edu.period_or_year}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 7. Contatos & 8. Data de Atualização */}
             <div className="pt-4 border-t border-border/60 text-[11px] text-muted-foreground flex items-center justify-between">
-              <span>Studio Freela • Centro Profissional</span>
+              <span>7. Contatos Profissionais: {phone || email || 'Studio Freela'}</span>
               <span>
                 {profile?.show_updated_at_in_cv !== false &&
-                  `Atualizado em ${formatShortDate(new Date().toISOString())}`}
+                  `8. Atualizado em ${formatShortDate(new Date().toISOString())}`}
               </span>
             </div>
           </div>
@@ -402,7 +484,7 @@ export function ResumePreviewModal({
               onClick={handleDownload}
               className="flex-1 sm:flex-none text-xs gap-1.5 bg-primary font-medium"
             >
-              <Download className="w-3.5 h-3.5" /> Baixar PDF
+              <Download className="w-3.5 h-3.5" /> Baixar Apresentação Profissional
             </Button>
           </div>
         </DialogFooter>

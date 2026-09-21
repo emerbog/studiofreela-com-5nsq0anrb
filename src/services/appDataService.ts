@@ -909,6 +909,7 @@ export const appDataService = {
       profEducation,
       profServices,
       profEquipment,
+      profQualifications,
     ] = await Promise.all([
       pb.collection('clients').getFullList({ filter: `user = "${userId}"` }),
       pb.collection('events').getFullList({ filter: `user = "${userId}"` }),
@@ -935,6 +936,10 @@ export const appDataService = {
         .collection('professional_equipment')
         .getFullList({ filter: `user = "${userId}"` })
         .catch(() => []),
+      pb
+        .collection('professional_qualifications')
+        .getFullList({ filter: `user = "${userId}"` })
+        .catch(() => []),
     ])
 
     return {
@@ -952,6 +957,7 @@ export const appDataService = {
       professionalEducation: profEducation,
       professionalServices: profServices,
       professionalEquipment: profEquipment,
+      professionalQualifications: profQualifications,
     }
   },
 

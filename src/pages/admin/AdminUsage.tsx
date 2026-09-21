@@ -105,7 +105,7 @@ export const AdminUsage: React.FC = () => {
       icon: Briefcase,
     },
     resume_generated: {
-      label: 'Currículo Gerado',
+      label: 'Apresentação Profissional Gerada',
       color: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
       icon: FileText,
     },
@@ -160,7 +160,7 @@ export const AdminUsage: React.FC = () => {
               <SelectItem value="event_created">Evento Criado</SelectItem>
               <SelectItem value="receivable_created">Recebível Criado</SelectItem>
               <SelectItem value="contract_generated">Contrato Gerado</SelectItem>
-              <SelectItem value="resume_generated">Currículo Gerado</SelectItem>
+              <SelectItem value="resume_generated">Apresentação Profissional Gerada</SelectItem>
               <SelectItem value="equipment_created">Equipamento Cadastrado</SelectItem>
             </SelectContent>
           </Select>

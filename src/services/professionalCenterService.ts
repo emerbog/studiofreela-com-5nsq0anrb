@@ -3,6 +3,7 @@ import {
   ProfessionalProfileData,
   ProfessionalExperience,
   ProfessionalEducation,
+  ProfessionalQualification,
   ProfessionalService,
   ProfessionalEquipment,
   ResumeBlockConfig,
@@ -12,31 +13,31 @@ export const DEFAULT_RESUME_BLOCKS: ResumeBlockConfig[] = [
   {
     id: 'b1',
     key: 'summary',
-    title: 'Resumo Profissional',
+    title: 'Apresentação & Áreas de Atuação',
     visibleInCv: true,
     visibleInPublic: true,
     order: 1,
   },
   {
     id: 'b2',
-    key: 'services',
-    title: 'Serviços Prestados',
+    key: 'skills',
+    title: 'Qualificações e Conhecimentos Específicos',
     visibleInCv: true,
     visibleInPublic: true,
     order: 2,
   },
   {
     id: 'b3',
-    key: 'experiences',
-    title: 'Experiência Profissional',
+    key: 'services',
+    title: 'Serviços Oferecidos',
     visibleInCv: true,
     visibleInPublic: true,
     order: 3,
   },
   {
     id: 'b4',
-    key: 'education',
-    title: 'Formação & Cursos',
+    key: 'experiences',
+    title: 'Últimas Empresas Onde Fiz Freelance',
     visibleInCv: true,
     visibleInPublic: true,
     order: 4,
@@ -44,34 +45,42 @@ export const DEFAULT_RESUME_BLOCKS: ResumeBlockConfig[] = [
   {
     id: 'b5',
     key: 'equipment',
-    title: 'Equipamentos para Locação',
+    title: 'Equipamentos Disponíveis para Locação',
     visibleInCv: true,
     visibleInPublic: true,
     order: 5,
   },
   {
     id: 'b6',
-    key: 'languages',
-    title: 'Idiomas & Regiões',
+    key: 'education',
+    title: 'Cursos & Certificações',
     visibleInCv: true,
     visibleInPublic: true,
     order: 6,
   },
   {
     id: 'b7',
-    key: 'contacts',
-    title: 'Contatos & Canais Oficiais',
+    key: 'languages',
+    title: 'Idiomas & Região de Atendimento',
     visibleInCv: true,
     visibleInPublic: true,
     order: 7,
   },
   {
     id: 'b8',
+    key: 'contacts',
+    title: 'Contatos Profissionais',
+    visibleInCv: true,
+    visibleInPublic: true,
+    order: 8,
+  },
+  {
+    id: 'b9',
     key: 'commercial_notes',
     title: 'Observações Comerciais',
     visibleInCv: false,
     visibleInPublic: false,
-    order: 8,
+    order: 9,
   },
 ]
 
@@ -212,6 +221,9 @@ export const professionalCenterService = {
         user: r.user,
         company_client: r.company_client,
         role: r.role,
+        service_type: r.service_type || '',
+        period_or_year: r.period_or_year || '',
+        city_state: r.city_state || '',
         start_date: r.start_date,
         end_date: r.end_date,
         current: !!r.current,
@@ -240,6 +252,9 @@ export const professionalCenterService = {
       user: userId,
       company_client: data.company_client,
       role: data.role,
+      service_type: data.service_type || '',
+      period_or_year: data.period_or_year || '',
+      city_state: data.city_state || '',
       start_date: data.start_date || '',
       end_date: data.end_date || '',
       current: !!data.current,
@@ -256,6 +271,9 @@ export const professionalCenterService = {
       user: r.user,
       company_client: r.company_client,
       role: r.role,
+      service_type: r.service_type,
+      period_or_year: r.period_or_year,
+      city_state: r.city_state,
       start_date: r.start_date,
       end_date: r.end_date,
       current: r.current,
@@ -280,6 +298,9 @@ export const professionalCenterService = {
       user: r.user,
       company_client: r.company_client,
       role: r.role,
+      service_type: r.service_type,
+      period_or_year: r.period_or_year,
+      city_state: r.city_state,
       start_date: r.start_date,
       end_date: r.end_date,
       current: r.current,
@@ -292,6 +313,104 @@ export const professionalCenterService = {
       created: r.created,
       updated: r.updated,
     }
+  },
+
+  // 2.5 Qualifications CRUD (Qualificações e Conhecimentos Específicos)
+  async getQualifications(): Promise<ProfessionalQualification[]> {
+    const userId = pb.authStore.record?.id
+    if (!userId) return []
+
+    try {
+      const records = await pb.collection('professional_qualifications').getFullList({
+        filter: `user = "${userId}"`,
+        sort: 'order,created',
+      })
+      return records.map((r) => ({
+        id: r.id,
+        user: r.user,
+        name: r.name,
+        category: r.category || '',
+        level: r.level || 'intermediario',
+        years_experience: r.years_experience || '',
+        practical_description: r.practical_description || '',
+        certificate_url: r.certificate_url || '',
+        external_link: r.external_link || '',
+        show_in_public: r.show_in_public !== false,
+        show_in_cv: r.show_in_cv !== false,
+        order: r.order || 0,
+        created: r.created,
+        updated: r.updated,
+      }))
+    } catch (err) {
+      console.warn('Erro ao carregar professional_qualifications:', err)
+      return []
+    }
+  },
+
+  async createQualification(
+    data: Omit<ProfessionalQualification, 'id'>,
+  ): Promise<ProfessionalQualification> {
+    const userId = pb.authStore.record?.id
+    if (!userId) throw new Error('Usuário não autenticado.')
+
+    const payload = {
+      user: userId,
+      name: data.name,
+      category: data.category || '',
+      level: data.level || 'intermediario',
+      years_experience: data.years_experience || '',
+      practical_description: data.practical_description || '',
+      certificate_url: data.certificate_url || '',
+      external_link: data.external_link || '',
+      show_in_public: data.show_in_public !== false,
+      show_in_cv: data.show_in_cv !== false,
+      order: data.order || 0,
+    }
+    const r = await pb.collection('professional_qualifications').create(payload)
+    return {
+      id: r.id,
+      user: r.user,
+      name: r.name,
+      category: r.category,
+      level: r.level,
+      years_experience: r.years_experience,
+      practical_description: r.practical_description,
+      certificate_url: r.certificate_url,
+      external_link: r.external_link,
+      show_in_public: r.show_in_public,
+      show_in_cv: r.show_in_cv,
+      order: r.order,
+      created: r.created,
+      updated: r.updated,
+    }
+  },
+
+  async updateQualification(
+    id: string,
+    data: Partial<ProfessionalQualification>,
+  ): Promise<ProfessionalQualification> {
+    const r = await pb.collection('professional_qualifications').update(id, data)
+    return {
+      id: r.id,
+      user: r.user,
+      name: r.name,
+      category: r.category,
+      level: r.level,
+      years_experience: r.years_experience,
+      practical_description: r.practical_description,
+      certificate_url: r.certificate_url,
+      external_link: r.external_link,
+      show_in_public: r.show_in_public,
+      show_in_cv: r.show_in_cv,
+      order: r.order,
+      created: r.created,
+      updated: r.updated,
+    }
+  },
+
+  async deleteQualification(id: string): Promise<boolean> {
+    await pb.collection('professional_qualifications').delete(id)
+    return true
   },
 
   async deleteExperience(id: string): Promise<boolean> {

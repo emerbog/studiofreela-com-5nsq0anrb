@@ -1,20 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useAuth } from '@/hooks/use-auth'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
-import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
@@ -23,6 +22,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,25 +40,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import { useAuth } from '@/hooks/use-auth'
-import { getAvatarUrl } from '@/services/userService'
-import { appDataService } from '@/services/appDataService'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
 import {
   professionalCenterService,
   DEFAULT_RESUME_BLOCKS,
 } from '@/services/professionalCenterService'
+import { appDataService } from '@/services/appDataService'
+import { getAvatarUrl } from '@/services/userService'
 import {
   UserProfile,
   ProfessionalProfileData,
   ProfessionalExperience,
   ProfessionalEducation,
+  ProfessionalQualification,
+  QualificationLevel,
   ProfessionalService,
   ProfessionalEquipment,
   ResumeBlockConfig,
@@ -64,14 +67,11 @@ import {
 } from '@/types'
 import { calculateProfileCompleteness } from '@/lib/profile-completeness'
 import { ResumePreviewModal } from '@/components/ResumePreviewModal'
-import { downloadResumeBinaryPdf, shareResumePdfFile, ResumePdfTheme } from '@/lib/resume-pdf'
+import { downloadResumeBinaryPdf, ResumePdfTheme } from '@/lib/resume-pdf'
 import { formatCurrency } from '@/lib/formatters'
 import { SubscriptionPlanModal } from '@/components/SubscriptionPlanModal'
 import {
   User,
-  Mail,
-  Phone,
-  Briefcase,
   MapPin,
   Camera,
   Save,
@@ -86,7 +86,6 @@ import {
   FileText,
   Wrench,
   Globe,
-  Share2,
   Plus,
   Edit2,
   Eye,
@@ -94,15 +93,36 @@ import {
   MoveUp,
   MoveDown,
   CheckCircle2,
-  Clock,
   Layers,
   Award,
   Crown,
   GraduationCap,
-  ChevronRight,
+  Briefcase,
+  AlertCircle,
+  ExternalLink,
+  HelpCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Link, useNavigate } from 'react-router-dom'
+
+const QUICK_QUALIFICATION_SUGGESTIONS = [
+  { name: 'Operação de painel de LED', category: 'Vídeo & Eventos' },
+  { name: 'Montagem de cenários', category: 'Cenografia' },
+  { name: 'Operação de vídeo', category: 'Vídeo' },
+  { name: 'Direção técnica', category: 'Produção' },
+  { name: 'Sonorização', category: 'Áudio' },
+  { name: 'Iluminação cênica', category: 'Iluminação' },
+  { name: 'Streaming & Transmissão ao vivo', category: 'Transmissão' },
+  { name: 'Fotografia de eventos', category: 'Fotografia' },
+  { name: 'Edição de vídeo', category: 'Pós-produção' },
+  { name: 'Produção de eventos', category: 'Produção' },
+  { name: 'Operação de mesas de som digitais', category: 'Áudio' },
+  { name: 'Software vMix & OBS Studio', category: 'Softwares' },
+  { name: 'Software DaVinci Resolve', category: 'Softwares' },
+  { name: 'Software Adobe Premiere Pro', category: 'Softwares' },
+  { name: 'Operação de câmeras PTZ e Cinema', category: 'Equipamentos' },
+]
 
 export default function Profile() {
   const { user, updateProfile, changePassword, logout } = useAuth()
@@ -111,16 +131,27 @@ export default function Profile() {
 
   // Tab state
   const [activeTab, setActiveTab] = useState<
-    'personal' | 'resume' | 'services' | 'equipment' | 'public_page' | 'security'
+    | 'personal'
+    | 'qualifications'
+    | 'experiences'
+    | 'services'
+    | 'equipment'
+    | 'public_page'
+    | 'security'
   >('personal')
 
   // Completeness state
   const [profProfile, setProfProfile] = useState<ProfessionalProfileData | null>(null)
+  const [qualifications, setQualifications] = useState<ProfessionalQualification[]>([])
   const [experiences, setExperiences] = useState<ProfessionalExperience[]>([])
   const [education, setEducation] = useState<ProfessionalEducation[]>([])
   const [services, setServices] = useState<ProfessionalService[]>([])
   const [equipment, setEquipment] = useState<ProfessionalEquipment[]>([])
   const [isLoadingCenter, setIsLoadingCenter] = useState<boolean>(true)
+
+  // Migration review state
+  const [showMigrationReview, setShowMigrationReview] = useState<boolean>(false)
+  const [isMigratingLegacy, setIsMigratingLegacy] = useState<boolean>(false)
 
   // User auth fields
   const [name, setName] = useState('')
@@ -130,7 +161,6 @@ export default function Profile() {
   const [address, setAddress] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewAvatar, setPreviewAvatar] = useState<string>('')
-  const [isUpdatingUser, setIsUpdatingUser] = useState(false)
 
   // Professional Data Extended fields
   const [commercialName, setCommercialName] = useState('')
@@ -156,11 +186,27 @@ export default function Profile() {
   const [resumeBlocks, setResumeBlocks] = useState<ResumeBlockConfig[]>(DEFAULT_RESUME_BLOCKS)
   const [isSavingProfData, setIsSavingProfData] = useState(false)
 
-  // Experience modal
+  // Qualifications Modal
+  const [qualDialogOpen, setQualDialogOpen] = useState(false)
+  const [editingQual, setEditingQual] = useState<ProfessionalQualification | null>(null)
+  const [qualName, setQualName] = useState('')
+  const [qualCategory, setQualCategory] = useState('')
+  const [qualLevel, setQualLevel] = useState<QualificationLevel>('intermediario')
+  const [qualYearsExp, setQualYearsExp] = useState('')
+  const [qualDesc, setQualDesc] = useState('')
+  const [qualCertUrl, setQualCertUrl] = useState('')
+  const [qualExtLink, setQualExtLink] = useState('')
+  const [qualShowCv, setQualShowCv] = useState(true)
+  const [qualShowPublic, setQualShowPublic] = useState(true)
+
+  // Experience modal (Últimas empresas onde fiz freelance)
   const [expDialogOpen, setExpDialogOpen] = useState(false)
   const [editingExp, setEditingExp] = useState<ProfessionalExperience | null>(null)
   const [expCompany, setExpCompany] = useState('')
   const [expRole, setExpRole] = useState('')
+  const [expServiceType, setExpServiceType] = useState('')
+  const [expPeriodOrYear, setExpPeriodOrYear] = useState('')
+  const [expCityState, setExpCityState] = useState('')
   const [expStart, setExpStart] = useState('')
   const [expEnd, setExpEnd] = useState('')
   const [expCurrent, setExpCurrent] = useState(false)
@@ -168,7 +214,7 @@ export default function Profile() {
   const [expDesc, setExpDesc] = useState('')
   const [expResults, setExpResults] = useState('')
   const [expShowCv, setExpShowCv] = useState(true)
-  const [expShowPublic, setExpShowPublic] = useState(true)
+  const [expShowPublic, setExpShowPublic] = useState(false) // Inicialmente oculto/privado por padrão
 
   // Education modal
   const [eduDialogOpen, setEduDialogOpen] = useState(false)
@@ -247,8 +293,9 @@ export default function Profile() {
   const loadProfessionalCenter = async () => {
     setIsLoadingCenter(true)
     try {
-      const [prof, exps, edus, srvs, eqs] = await Promise.all([
+      const [prof, quals, exps, edus, srvs, eqs] = await Promise.all([
         professionalCenterService.getProfile(),
+        professionalCenterService.getQualifications(),
         professionalCenterService.getExperiences(),
         professionalCenterService.getEducation(),
         professionalCenterService.getServices(),
@@ -256,6 +303,7 @@ export default function Profile() {
       ])
 
       setProfProfile(prof)
+      setQualifications(quals)
       setExperiences(exps)
       setEducation(edus)
       setServices(srvs)
@@ -289,6 +337,11 @@ export default function Profile() {
         if (prof.resume_blocks_config && prof.resume_blocks_config.length > 0) {
           setResumeBlocks(prof.resume_blocks_config)
         }
+      }
+
+      // Se houver experiências antigas que ainda não foram revisadas ou qualificações vazias
+      if (quals.length === 0 && (edus.length > 0 || (prof?.bio && prof.bio.length > 0))) {
+        setShowMigrationReview(true)
       }
     } finally {
       setIsLoadingCenter(false)
@@ -376,7 +429,7 @@ export default function Profile() {
       })
 
       setProfProfile(updated)
-      toast.success('Dados profissionais salvos com sucesso!')
+      toast.success('Apresentação profissional salva com sucesso!')
     } catch (err: any) {
       toast.error('Erro ao salvar dados profissionais', {
         description: err?.message || 'Tente novamente.',
@@ -386,21 +439,12 @@ export default function Profile() {
     }
   }
 
-  // Save Block toggle for Resume
+  // Save Block toggle for Presentation
   const handleToggleBlockCv = async (id: string) => {
     const next = resumeBlocks.map((b) => (b.id === id ? { ...b, visibleInCv: !b.visibleInCv } : b))
     setResumeBlocks(next)
     await professionalCenterService.upsertProfile({ resume_blocks_config: next })
-    toast.success('Visibilidade do bloco no currículo atualizada.')
-  }
-
-  const handleToggleBlockPublic = async (id: string) => {
-    const next = resumeBlocks.map((b) =>
-      b.id === id ? { ...b, visibleInPublic: !b.visibleInPublic } : b,
-    )
-    setResumeBlocks(next)
-    await professionalCenterService.upsertProfile({ resume_blocks_config: next })
-    toast.success('Visibilidade do bloco público atualizada.')
+    toast.success('Visibilidade do bloco na apresentação atualizada.')
   }
 
   const handleMoveBlock = async (index: number, direction: 'up' | 'down') => {
@@ -415,11 +459,121 @@ export default function Profile() {
     await professionalCenterService.upsertProfile({ resume_blocks_config: reordered })
   }
 
-  // Experiences handlers
+  // =========================================================================
+  // QUALIFICATIONS HANDLERS (Qualificações e Conhecimentos Específicos)
+  // =========================================================================
+  const handleOpenAddQual = (prefill?: { name: string; category: string }) => {
+    setEditingQual(null)
+    setQualName(prefill?.name || '')
+    setQualCategory(prefill?.category || '')
+    setQualLevel('intermediario')
+    setQualYearsExp('')
+    setQualDesc('')
+    setQualCertUrl('')
+    setQualExtLink('')
+    setQualShowCv(true)
+    setQualShowPublic(true)
+    setQualDialogOpen(true)
+  }
+
+  const handleOpenEditQual = (q: ProfessionalQualification) => {
+    setEditingQual(q)
+    setQualName(q.name)
+    setQualCategory(q.category || '')
+    setQualLevel(q.level || 'intermediario')
+    setQualYearsExp(q.years_experience || '')
+    setQualDesc(q.practical_description || '')
+    setQualCertUrl(q.certificate_url || '')
+    setQualExtLink(q.external_link || '')
+    setQualShowCv(q.show_in_cv !== false)
+    setQualShowPublic(q.show_in_public !== false)
+    setQualDialogOpen(true)
+  }
+
+  const handleSaveQual = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!qualName.trim()) {
+      toast.error('Informe o nome da qualificação ou conhecimento.')
+      return
+    }
+
+    try {
+      if (editingQual?.id) {
+        const updated = await professionalCenterService.updateQualification(editingQual.id, {
+          name: qualName.trim(),
+          category: qualCategory.trim(),
+          level: qualLevel,
+          years_experience: qualYearsExp.trim(),
+          practical_description: qualDesc.trim(),
+          certificate_url: qualCertUrl.trim(),
+          external_link: qualExtLink.trim(),
+          show_in_cv: qualShowCv,
+          show_in_public: qualShowPublic,
+        })
+        setQualifications((prev) => prev.map((x) => (x.id === editingQual.id ? updated : x)))
+        toast.success('Qualificação atualizada com sucesso!')
+      } else {
+        const created = await professionalCenterService.createQualification({
+          name: qualName.trim(),
+          category: qualCategory.trim(),
+          level: qualLevel,
+          years_experience: qualYearsExp.trim(),
+          practical_description: qualDesc.trim(),
+          certificate_url: qualCertUrl.trim(),
+          external_link: qualExtLink.trim(),
+          show_in_cv: qualShowCv,
+          show_in_public: qualShowPublic,
+          order: qualifications.length + 1,
+        })
+        setQualifications((prev) => [...prev, created])
+        toast.success('Qualificação cadastrada com sucesso!')
+      }
+      setQualDialogOpen(false)
+    } catch (err: any) {
+      toast.error('Erro ao salvar qualificação', { description: err?.message })
+    }
+  }
+
+  const handleDeleteQual = async (id: string) => {
+    try {
+      await professionalCenterService.deleteQualification(id)
+      setQualifications((prev) => prev.filter((x) => x.id !== id))
+      toast.success('Qualificação removida.')
+    } catch (err: any) {
+      toast.error('Erro ao remover qualificação.')
+    }
+  }
+
+  const handleMoveQual = async (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= qualifications.length) return
+    const next = [...qualifications]
+    const temp = next[index]
+    next[index] = next[targetIndex]
+    next[targetIndex] = temp
+
+    setQualifications(next)
+    try {
+      await Promise.all(
+        next.map((q, idx) =>
+          q.id ? professionalCenterService.updateQualification(q.id, { order: idx + 1 }) : null,
+        ),
+      )
+    } catch (err) {
+      console.warn('Erro ao atualizar ordenação:', err)
+    }
+  }
+
+  // =========================================================================
+  // EXPERIENCES HANDLERS (Últimas empresas onde fiz freelance)
+  // =========================================================================
   const handleOpenAddExp = () => {
     setEditingExp(null)
     setExpCompany('')
     setExpRole('')
+    setExpServiceType('')
+    setExpPeriodOrYear('')
+    setExpCityState('')
     setExpStart('')
     setExpEnd('')
     setExpCurrent(false)
@@ -427,7 +581,7 @@ export default function Profile() {
     setExpDesc('')
     setExpResults('')
     setExpShowCv(true)
-    setExpShowPublic(true)
+    setExpShowPublic(false) // Inicia oculta/privada conforme especificação de privacidade
     setExpDialogOpen(true)
   }
 
@@ -435,6 +589,9 @@ export default function Profile() {
     setEditingExp(exp)
     setExpCompany(exp.company_client)
     setExpRole(exp.role)
+    setExpServiceType(exp.service_type || '')
+    setExpPeriodOrYear(exp.period_or_year || '')
+    setExpCityState(exp.city_state || exp.location_or_mode || '')
     setExpStart(exp.start_date || '')
     setExpEnd(exp.end_date || '')
     setExpCurrent(!!exp.current)
@@ -442,53 +599,59 @@ export default function Profile() {
     setExpDesc(exp.description || '')
     setExpResults(exp.results_projects || '')
     setExpShowCv(exp.show_in_cv !== false)
-    setExpShowPublic(exp.show_in_public !== false)
+    setExpShowPublic(!!exp.show_in_public)
     setExpDialogOpen(true)
   }
 
   const handleSaveExp = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!expCompany.trim() || !expRole.trim()) {
-      toast.error('Informe a empresa/cliente e a função.')
+      toast.error('Informe a empresa/cliente e a função exercida no freelance.')
       return
     }
 
     try {
       if (editingExp?.id) {
         const updated = await professionalCenterService.updateExperience(editingExp.id, {
-          company_client: expCompany,
-          role: expRole,
-          start_date: expStart,
-          end_date: expEnd,
+          company_client: expCompany.trim(),
+          role: expRole.trim(),
+          service_type: expServiceType.trim(),
+          period_or_year: expPeriodOrYear.trim(),
+          city_state: expCityState.trim(),
+          start_date: expStart.trim(),
+          end_date: expEnd.trim(),
           current: expCurrent,
-          location_or_mode: expLocation,
-          description: expDesc,
-          results_projects: expResults,
+          location_or_mode: expCityState.trim() || expLocation.trim(),
+          description: expDesc.trim(),
+          results_projects: expResults.trim(),
           show_in_cv: expShowCv,
           show_in_public: expShowPublic,
         })
         setExperiences((prev) => prev.map((x) => (x.id === editingExp.id ? updated : x)))
-        toast.success('Experiência atualizada com sucesso!')
+        toast.success('Experiência freelance atualizada com sucesso!')
       } else {
         const created = await professionalCenterService.createExperience({
-          company_client: expCompany,
-          role: expRole,
-          start_date: expStart,
-          end_date: expEnd,
+          company_client: expCompany.trim(),
+          role: expRole.trim(),
+          service_type: expServiceType.trim(),
+          period_or_year: expPeriodOrYear.trim(),
+          city_state: expCityState.trim(),
+          start_date: expStart.trim(),
+          end_date: expEnd.trim(),
           current: expCurrent,
-          location_or_mode: expLocation,
-          description: expDesc,
-          results_projects: expResults,
+          location_or_mode: expCityState.trim() || expLocation.trim(),
+          description: expDesc.trim(),
+          results_projects: expResults.trim(),
           show_in_cv: expShowCv,
           show_in_public: expShowPublic,
           order: experiences.length + 1,
         })
         setExperiences((prev) => [...prev, created])
-        toast.success('Experiência adicionada!')
+        toast.success('Experiência freelance adicionada!')
       }
       setExpDialogOpen(false)
     } catch (err: any) {
-      toast.error('Erro ao salvar experiência', { description: err?.message })
+      toast.error('Erro ao salvar experiência freelance', { description: err?.message })
     }
   }
 
@@ -496,13 +659,103 @@ export default function Profile() {
     try {
       await professionalCenterService.deleteExperience(id)
       setExperiences((prev) => prev.filter((x) => x.id !== id))
-      toast.success('Experiência removida.')
+      toast.success('Experiência freelance removida.')
     } catch (err: any) {
       toast.error('Erro ao remover experiência.')
     }
   }
 
-  // Education handlers
+  const handleToggleExpPublic = async (exp: ProfessionalExperience) => {
+    if (!exp.id) return
+    const nextVal = !exp.show_in_public
+    try {
+      const updated = await professionalCenterService.updateExperience(exp.id, {
+        show_in_public: nextVal,
+      })
+      setExperiences((prev) => prev.map((x) => (x.id === exp.id ? updated : x)))
+      if (nextVal) {
+        toast.info('Empresa/cliente visível publicamente. Certifique-se de ter autorização.')
+      } else {
+        toast.success('Empresa/cliente ocultada publicamente.')
+      }
+    } catch (err) {
+      toast.error('Erro ao alterar visibilidade pública.')
+    }
+  }
+
+  // =========================================================================
+  // MIGRATION ASSISTANT (Preserva dados legados e propõe qualificações)
+  // =========================================================================
+  const handleMigrateLegacyData = async () => {
+    setIsMigratingLegacy(true)
+    try {
+      // 1. Garantir que todas as experiências antigas tenham show_in_public = false (ocultas por segurança)
+      let countExps = 0
+      for (const exp of experiences) {
+        if (exp.id && exp.show_in_public !== false) {
+          await professionalCenterService.updateExperience(exp.id, {
+            show_in_public: false,
+            service_type: exp.service_type || 'Prestação de serviços freelance',
+          })
+          countExps++
+        }
+      }
+
+      // 2. Se as qualificações estiverem vazias, migrar cursos relevantes como qualificações
+      let countQuals = 0
+      if (qualifications.length === 0) {
+        for (const edu of education) {
+          await professionalCenterService.createQualification({
+            name: edu.course_name,
+            category: edu.institution || 'Formação & Certificações',
+            level: 'avancado',
+            years_experience: edu.period_or_year || '',
+            practical_description: `Conhecimento e certificação obtidos em ${edu.institution}.`,
+            certificate_url: edu.certificate_url || '',
+            show_in_cv: true,
+            show_in_public: true,
+            order: countQuals + 1,
+          })
+          countQuals++
+        }
+
+        // Sugerir qualificação inicial baseada no título profissional
+        if (profTitle || profession) {
+          await professionalCenterService.createQualification({
+            name: profTitle || profession,
+            category: 'Especialidade Principal',
+            level: 'especialista',
+            years_experience: yearsExp ? `${yearsExp} anos` : '',
+            practical_description: bio ? bio.slice(0, 160) : 'Atuação prática e especializada.',
+            show_in_cv: true,
+            show_in_public: true,
+            order: countQuals + 1,
+          })
+          countQuals++
+        }
+      }
+
+      // Recarrega
+      const [newQuals, newExps] = await Promise.all([
+        professionalCenterService.getQualifications(),
+        professionalCenterService.getExperiences(),
+      ])
+      setQualifications(newQuals)
+      setExperiences(newExps)
+
+      setShowMigrationReview(false)
+      toast.success('Dados revisados e adaptados com sucesso para a nova estrutura de Freelance!')
+    } catch (err: any) {
+      console.error(err)
+      toast.error('Erro na revisão assistida de dados.')
+    } finally {
+      setIsMigratingLegacy(false)
+    }
+  }
+
+  // =========================================================================
+  // EDUCATION HANDLERS
+  // =========================================================================
   const handleOpenAddEdu = () => {
     setEditingEdu(null)
     setEduInst('')
@@ -537,10 +790,10 @@ export default function Profile() {
     try {
       if (editingEdu?.id) {
         const updated = await professionalCenterService.updateEducation(editingEdu.id, {
-          institution: eduInst,
-          course_name: eduCourse,
-          period_or_year: eduPeriod,
-          certificate_url: eduCert,
+          institution: eduInst.trim(),
+          course_name: eduCourse.trim(),
+          period_or_year: eduPeriod.trim(),
+          certificate_url: eduCert.trim(),
           type: eduType,
           show_in_cv: eduShowCv,
           show_in_public: eduShowPublic,
@@ -549,10 +802,10 @@ export default function Profile() {
         toast.success('Formação/curso atualizado!')
       } else {
         const created = await professionalCenterService.createEducation({
-          institution: eduInst,
-          course_name: eduCourse,
-          period_or_year: eduPeriod,
-          certificate_url: eduCert,
+          institution: eduInst.trim(),
+          course_name: eduCourse.trim(),
+          period_or_year: eduPeriod.trim(),
+          certificate_url: eduCert.trim(),
           type: eduType,
           show_in_cv: eduShowCv,
           show_in_public: eduShowPublic,
@@ -577,7 +830,9 @@ export default function Profile() {
     }
   }
 
-  // Services handlers
+  // =========================================================================
+  // SERVICES HANDLERS
+  // =========================================================================
   const handleOpenAddSrv = () => {
     setEditingSrv(null)
     setSrvName('')
@@ -616,12 +871,12 @@ export default function Profile() {
     try {
       if (editingSrv?.id) {
         const updated = await professionalCenterService.updateService(editingSrv.id, {
-          name: srvName,
-          short_description: srvDesc,
+          name: srvName.trim(),
+          short_description: srvDesc.trim(),
           category: srvCategory,
           billing_unit: srvBillingUnit,
           starting_price: srvStartPrice ? parseFloat(srvStartPrice) : 0,
-          price_range: srvPriceRange,
+          price_range: srvPriceRange.trim(),
           is_available: srvIsAvailable,
           show_in_cv: srvShowCv,
           show_in_public: srvShowPublic,
@@ -630,12 +885,12 @@ export default function Profile() {
         toast.success('Serviço atualizado com sucesso!')
       } else {
         const created = await professionalCenterService.createService({
-          name: srvName,
-          short_description: srvDesc,
+          name: srvName.trim(),
+          short_description: srvDesc.trim(),
           category: srvCategory,
           billing_unit: srvBillingUnit,
           starting_price: srvStartPrice ? parseFloat(srvStartPrice) : 0,
-          price_range: srvPriceRange,
+          price_range: srvPriceRange.trim(),
           is_available: srvIsAvailable,
           show_in_cv: srvShowCv,
           show_in_public: srvShowPublic,
@@ -660,7 +915,9 @@ export default function Profile() {
     }
   }
 
-  // Equipment handlers
+  // =========================================================================
+  // EQUIPMENT HANDLERS
+  // =========================================================================
   const handleOpenAddEq = () => {
     setEditingEq(null)
     setEqName('')
@@ -715,18 +972,18 @@ export default function Profile() {
     try {
       if (editingEq?.id) {
         const updated = await professionalCenterService.updateEquipment(editingEq.id, {
-          name: eqName,
+          name: eqName.trim(),
           category: eqCategory,
-          brand: eqBrand,
-          model: eqModel,
+          brand: eqBrand.trim(),
+          model: eqModel.trim(),
           quantity: Math.max(1, Number(eqQty) || 1),
-          technical_description: eqDesc,
+          technical_description: eqDesc.trim(),
           condition: eqCondition,
           hourly_rate: eqHourly ? parseFloat(eqHourly) : 0,
           daily_rate: eqDaily ? parseFloat(eqDaily) : 0,
           event_rate: eqEvent ? parseFloat(eqEvent) : 0,
-          deposit_or_commercial_note: eqDeposit,
-          approximate_location: eqLocation,
+          deposit_or_commercial_note: eqDeposit.trim(),
+          approximate_location: eqLocation.trim(),
           needs_operator: eqNeedsOp,
           status: eqStatus,
           show_in_public: eqShowPublic,
@@ -737,18 +994,18 @@ export default function Profile() {
         toast.success('Equipamento atualizado com sucesso!')
       } else {
         const created = await professionalCenterService.createEquipment({
-          name: eqName,
+          name: eqName.trim(),
           category: eqCategory,
-          brand: eqBrand,
-          model: eqModel,
+          brand: eqBrand.trim(),
+          model: eqModel.trim(),
           quantity: Math.max(1, Number(eqQty) || 1),
-          technical_description: eqDesc,
+          technical_description: eqDesc.trim(),
           condition: eqCondition,
           hourly_rate: eqHourly ? parseFloat(eqHourly) : 0,
           daily_rate: eqDaily ? parseFloat(eqDaily) : 0,
           event_rate: eqEvent ? parseFloat(eqEvent) : 0,
-          deposit_or_commercial_note: eqDeposit,
-          approximate_location: eqLocation,
+          deposit_or_commercial_note: eqDeposit.trim(),
+          approximate_location: eqLocation.trim(),
           needs_operator: eqNeedsOp,
           status: eqStatus,
           show_in_public: eqShowPublic,
@@ -783,6 +1040,7 @@ export default function Profile() {
     education,
     services,
     equipment,
+    qualifications,
   )
 
   // Security / Password Handlers
@@ -859,17 +1117,19 @@ export default function Profile() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl text-heading font-semibold font-serif">Centro Profissional</h1>
+            <h1 className="text-3xl text-heading font-semibold font-serif">
+              Meu Perfil Profissional
+            </h1>
             <Badge
               variant="secondary"
               className="font-normal bg-primary/10 text-primary border-primary/20"
             >
-              <Sparkles className="w-3 h-3 mr-1 text-primary" /> Beta
+              <Sparkles className="w-3 h-3 mr-1 text-primary" /> Perfil Freelancer
             </Badge>
           </div>
           <p className="text-muted-foreground text-xs sm:text-sm">
-            Gerencie seus dados profissionais, currículo, serviços e equipamentos para orçamentos e
-            locação.
+            Apresente suas qualificações, áreas de atuação, empresas atendidas como freelance,
+            serviços e equipamentos.
           </p>
         </div>
 
@@ -882,7 +1142,7 @@ export default function Profile() {
             className="text-xs gap-1.5"
           >
             <Eye className="w-3.5 h-3.5 text-primary" />
-            Visualizar Currículo
+            Visualizar Apresentação
           </Button>
 
           <Button
@@ -899,6 +1159,53 @@ export default function Profile() {
           </Button>
         </div>
       </div>
+
+      {/* Migration Review Banner */}
+      {showMigrationReview && (
+        <Card className="border-amber-500/40 bg-amber-500/5 shadow-sm">
+          <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-0.5 text-xs">
+                <span className="font-semibold text-foreground text-sm">
+                  Novo Formato: Perfil de Qualificações & Experiências Freelance
+                </span>
+                <p className="text-muted-foreground">
+                  Apresentação profissional reformulada para destacar sua experiência prática e
+                  conhecimentos específicos. Suas empresas cadastradas foram mantidas em segurança e
+                  permanecem privadas por padrão.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMigrationReview(false)}
+                className="text-xs"
+              >
+                Dispensar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleMigrateLegacyData}
+                disabled={isMigratingLegacy}
+                className="text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1.5"
+              >
+                {isMigratingLegacy ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                Confirmar Dados & Adaptar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Top Banner Card: Profile Overview & Completeness Bar */}
       <Card className="border-border/70 shadow-sm bg-card overflow-hidden">
@@ -981,6 +1288,7 @@ export default function Profile() {
                     education,
                     services,
                     equipment,
+                    qualifications,
                     {
                       theme: pdfTheme,
                     },
@@ -989,7 +1297,7 @@ export default function Profile() {
                 className="text-xs h-8 gap-1.5 bg-primary text-primary-foreground shadow-sm"
               >
                 <Download className="w-3.5 h-3.5" />
-                Baixar Currículo PDF
+                Baixar Apresentação Profissional
               </Button>
             </div>
           </div>
@@ -999,12 +1307,11 @@ export default function Profile() {
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-foreground flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-                Completude do Perfil Profissional:{' '}
+                Completude do Perfil de Qualificações:{' '}
                 <strong className="text-primary">{completeness.percentage}%</strong>
               </span>
               <span className="text-[11px] text-muted-foreground">
                 {completeness.completedCount} de {completeness.totalCount} etapas concluídas
-                (opcional)
               </span>
             </div>
             <Progress value={completeness.percentage} className="h-2" />
@@ -1025,38 +1332,41 @@ export default function Profile() {
         <div className="overflow-x-auto pb-1">
           <TabsList className="h-10 bg-muted/60 p-1 flex w-max sm:w-full justify-start sm:justify-between border border-border/50">
             <TabsTrigger value="personal" className="text-xs gap-1.5 px-3">
-              <User className="w-3.5 h-3.5" /> 1. Dados Profissionais
+              <User className="w-3.5 h-3.5" /> 1. Apresentação Profissional
             </TabsTrigger>
-            <TabsTrigger value="resume" className="text-xs gap-1.5 px-3">
-              <FileText className="w-3.5 h-3.5" /> 2. Currículo
+            <TabsTrigger value="qualifications" className="text-xs gap-1.5 px-3">
+              <Award className="w-3.5 h-3.5" /> 2. Qualificações & Conhecimentos
+            </TabsTrigger>
+            <TabsTrigger value="experiences" className="text-xs gap-1.5 px-3">
+              <Briefcase className="w-3.5 h-3.5" /> 3. Freelances & Clientes
             </TabsTrigger>
             <TabsTrigger value="services" className="text-xs gap-1.5 px-3">
-              <Layers className="w-3.5 h-3.5" /> 3. Serviços & Especialidades
+              <Layers className="w-3.5 h-3.5" /> 4. Serviços Oferecidos
             </TabsTrigger>
             <TabsTrigger value="equipment" className="text-xs gap-1.5 px-3">
-              <Wrench className="w-3.5 h-3.5" /> 4. Equipamentos Locação
+              <Wrench className="w-3.5 h-3.5" /> 5. Equipamentos Locação
             </TabsTrigger>
             <TabsTrigger value="public_page" className="text-xs gap-1.5 px-3">
-              <Globe className="w-3.5 h-3.5" /> 5. Apresentação Pública
+              <Globe className="w-3.5 h-3.5" /> 6. Portfólio & Apresentação
             </TabsTrigger>
             <TabsTrigger value="security" className="text-xs gap-1.5 px-3">
-              <KeyRound className="w-3.5 h-3.5" /> Segurança
+              <KeyRound className="w-3.5 h-3.5" /> Segurança & Privacidade
             </TabsTrigger>
           </TabsList>
         </div>
 
         {/* ============================================================= */}
-        {/* ABA 1: DADOS PROFISSIONAIS */}
+        {/* ABA 1: APRESENTAÇÃO PROFISSIONAL */}
         {/* ============================================================= */}
         <TabsContent value="personal" className="space-y-6">
           <Card className="border-border/70 shadow-sm bg-card">
             <CardHeader>
               <CardTitle className="text-lg font-serif">
-                1. Dados Profissionais & Identificação
+                1. Apresentação Profissional & Identificação
               </CardTitle>
               <CardDescription className="text-xs">
-                Preencha seus dados de atendimento, canais profissionais e apresentação. O
-                preenchimento é opcional e pode ser salvo a qualquer momento.
+                Preencha seus dados de atendimento, canais profissionais e áreas de atuação. O
+                preenchimento é opcional e pode ser atualizado a qualquer momento.
               </CardDescription>
             </CardHeader>
 
@@ -1069,13 +1379,13 @@ export default function Profile() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="inp-name" className="text-xs font-medium">
-                      Nome Profissional / Completo *
+                      Nome Profissional ou Nome Completo *
                     </Label>
                     <Input
                       id="inp-name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Seu nome completo"
+                      placeholder="Seu nome profissional"
                       className="text-xs h-9"
                       required
                     />
@@ -1083,7 +1393,7 @@ export default function Profile() {
 
                   <div className="space-y-1.5">
                     <Label htmlFor="inp-comm-name" className="text-xs font-medium">
-                      Nome Artístico ou Comercial
+                      Nome Comercial ou Marca (opcional)
                     </Label>
                     <Input
                       id="inp-comm-name"
@@ -1143,7 +1453,7 @@ export default function Profile() {
 
                   <div className="space-y-1.5">
                     <Label htmlFor="inp-prof-email" className="text-xs font-medium">
-                      E-mail Profissional de Contato
+                      E-mail Profissional
                     </Label>
                     <Input
                       id="inp-prof-email"
@@ -1159,11 +1469,11 @@ export default function Profile() {
                 <div className="p-3 bg-muted/30 rounded-lg border border-border/50 flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="sw-hide-addr" className="text-xs font-medium cursor-pointer">
-                      Ocultar endereço residencial
+                      Exibir somente Cidade e Estado por padrão
                     </Label>
                     <p className="text-[11px] text-muted-foreground">
-                      Exibe somente Cidade/UF no currículo e propostas, resguardando sua privacidade
-                      residencial.
+                      Protege sua privacidade residencial, ocultando endereço completo, telefone e
+                      e-mail em visualizações públicas sem autorização.
                     </p>
                   </div>
                   <Switch
@@ -1175,7 +1485,7 @@ export default function Profile() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="inp-address" className="text-xs font-medium">
-                    Endereço Completo (Interno / Uso em Contratos)
+                    Endereço Completo (Interno / Apenas para Contratos e Propostas)
                   </Label>
                   <Input
                     id="inp-address"
@@ -1190,13 +1500,13 @@ export default function Profile() {
               {/* Apresentação Curta */}
               <div className="space-y-3 pt-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-primary border-b border-border/40 pb-1">
-                  Apresentação Profissional
+                  Áreas de Atuação & Descrição
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="inp-prof-title" className="text-xs font-medium">
-                      Título Profissional
+                      Função Principal / Especialidade
                     </Label>
                     <Input
                       id="inp-prof-title"
@@ -1205,14 +1515,14 @@ export default function Profile() {
                         setProfTitle(e.target.value)
                         setProfession(e.target.value)
                       }}
-                      placeholder="Ex: Fotógrafo de Eventos Corporativos"
+                      placeholder="Ex: Diretor Técnico / Operador de LED"
                       className="text-xs h-9"
                     />
                   </div>
 
                   <div className="space-y-1.5">
                     <Label htmlFor="inp-years-exp" className="text-xs font-medium">
-                      Anos de Experiência
+                      Tempo de Atuação Prática (Anos)
                     </Label>
                     <Input
                       id="inp-years-exp"
@@ -1237,7 +1547,7 @@ export default function Profile() {
                     maxLength={130}
                     value={headline}
                     onChange={(e) => setHeadline(e.target.value)}
-                    placeholder="Ex: Transformando momentos corporativos e sociais em memórias visuais de alto impacto."
+                    placeholder="Ex: Especialista em montagem e operação de transmissões de alto impacto."
                     className="text-xs h-9"
                   />
                 </div>
@@ -1245,7 +1555,7 @@ export default function Profile() {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="inp-bio" className="text-xs font-medium">
-                      Biografia Profissional Resumida (~1000 caracteres)
+                      Descrição Curta / Apresentação Profissional (~1000 caracteres)
                     </Label>
                     <span className="text-[10px] text-muted-foreground">{bio.length}/1000</span>
                   </div>
@@ -1254,14 +1564,14 @@ export default function Profile() {
                     maxLength={1100}
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
-                    placeholder="Descreva sua trajetória, diferenciais de atendimento, principais nichos e metodologia de entrega..."
+                    placeholder="Apresente sua experiência prática, áreas de atuação, diferenciais operacionais e perfil de entrega..."
                     className="text-xs min-h-[90px] resize-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Modalidade de Atendimento</Label>
+                    <Label className="text-xs font-medium">Disponibilidade</Label>
                     <Select value={workMode} onValueChange={(val: any) => setWorkMode(val)}>
                       <SelectTrigger className="text-xs h-9">
                         <SelectValue />
@@ -1269,20 +1579,20 @@ export default function Profile() {
                       <SelectContent>
                         <SelectItem value="presencial">Presencial</SelectItem>
                         <SelectItem value="remoto">Remoto</SelectItem>
-                        <SelectItem value="hibrido">Híbrido</SelectItem>
+                        <SelectItem value="hibrido">Presencial ou Remoto</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label htmlFor="inp-regions" className="text-xs font-medium">
-                      Regiões Atendidas
+                      Região de Atendimento
                     </Label>
                     <Input
                       id="inp-regions"
                       value={servedRegions}
                       onChange={(e) => setServedRegions(e.target.value)}
-                      placeholder="Ex: Grande São Paulo, Campinas e Litoral"
+                      placeholder="Ex: Grande São Paulo, Campinas e todo o Brasil sob consulta"
                       className="text-xs h-9"
                     />
                   </div>
@@ -1308,7 +1618,8 @@ export default function Profile() {
                         Disponibilidade para Viagens
                       </Label>
                       <p className="text-[11px] text-muted-foreground">
-                        Sinaliza aos contratantes sua mobilidade para atender fora da sua cidade.
+                        Sinaliza aos contratantes sua mobilidade para atender em outras
+                        cidades/estados.
                       </p>
                     </div>
                     <Switch id="sw-travel" checked={travelAvail} onCheckedChange={setTravelAvail} />
@@ -1319,7 +1630,7 @@ export default function Profile() {
               {/* Links e Redes Profissionais */}
               <div className="space-y-3 pt-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-primary border-b border-border/40 pb-1">
-                  Links & Redes Profissionais
+                  Contatos & Redes Oficiais
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
@@ -1350,7 +1661,7 @@ export default function Profile() {
 
                   <div className="space-y-1.5">
                     <Label htmlFor="inp-web" className="text-xs font-medium">
-                      Website / Portfólio
+                      Website / Portfólio Externo
                     </Label>
                     <Input
                       id="inp-web"
@@ -1363,7 +1674,7 @@ export default function Profile() {
 
                   <div className="space-y-1.5">
                     <Label htmlFor="inp-yt" className="text-xs font-medium">
-                      YouTube / Vimeo
+                      YouTube / Vimeo / Demonstrações
                     </Label>
                     <Input
                       id="inp-yt"
@@ -1385,7 +1696,7 @@ export default function Profile() {
                 onClick={() => setPreviewModalOpen(true)}
                 className="w-full sm:w-auto text-xs gap-1.5"
               >
-                <Eye className="w-3.5 h-3.5" /> Prévia no Currículo
+                <Eye className="w-3.5 h-3.5" /> Prévia da Apresentação
               </Button>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1401,7 +1712,7 @@ export default function Profile() {
                     </>
                   ) : (
                     <>
-                      <Save className="w-3.5 h-3.5" /> Salvar e Continuar Depois
+                      <Save className="w-3.5 h-3.5" /> Salvar Apresentação
                     </>
                   )}
                 </Button>
@@ -1411,123 +1722,315 @@ export default function Profile() {
         </TabsContent>
 
         {/* ============================================================= */}
-        {/* ABA 2: CURRÍCULO PROFISSIONAL */}
+        {/* ABA 2: QUALIFICAÇÕES E CONHECIMENTOS ESPECÍFICOS */}
         {/* ============================================================= */}
-        <TabsContent value="resume" className="space-y-6">
+        <TabsContent value="qualifications" className="space-y-6">
           <Card className="border-border/70 shadow-sm bg-card">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <CardTitle className="text-lg font-serif">
-                  2. Editor de Currículo Profissional
+                  2. Qualificações e Conhecimentos Específicos
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Organize, ordene e defina a privacidade de cada bloco. O currículo reutiliza seus
-                  dados do perfil sem retrabalho.
+                  Cadastre habilidades práticas, softwares dominados e equipamentos operados para
+                  destacar seu diferencial freelance.
                 </CardDescription>
               </div>
 
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
-                  variant="outline"
                   size="sm"
-                  onClick={() => setPreviewModalOpen(true)}
-                  className="text-xs gap-1.5"
-                >
-                  <Eye className="w-3.5 h-3.5" /> Prévia do Currículo
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() =>
-                    downloadResumeBinaryPdf(
-                      user,
-                      profProfile,
-                      experiences,
-                      education,
-                      services,
-                      equipment,
-                      {
-                        theme: pdfTheme,
-                      },
-                    )
-                  }
+                  onClick={() => handleOpenAddQual()}
                   className="text-xs gap-1.5 bg-primary"
                 >
-                  <Download className="w-3.5 h-3.5" /> Baixar PDF
+                  <Plus className="w-3.5 h-3.5" /> Cadastrar Qualificação
                 </Button>
               </div>
             </CardHeader>
 
             <CardContent className="space-y-6">
-              {/* Opção da data de atualização no CV */}
-              <div className="p-3 bg-muted/30 rounded-lg border border-border/50 flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="sw-cv-date" className="text-xs font-medium cursor-pointer">
-                    Exibir data de atualização no rodapé do currículo
-                  </Label>
-                  <p className="text-[11px] text-muted-foreground">
-                    Informa quando o documento foi gerado sem expor datas de criação internas do
-                    app.
-                  </p>
+              {/* Sugestões Rápidas */}
+              <div className="p-3 bg-muted/20 border border-border/50 rounded-xl space-y-2">
+                <span className="text-[11px] font-semibold text-foreground uppercase tracking-wider block">
+                  Sugestões Rápidas (Clique para adicionar):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {QUICK_QUALIFICATION_SUGGESTIONS.map((item, idx) => {
+                    const alreadyAdded = qualifications.some(
+                      (q) => q.name.toLowerCase() === item.name.toLowerCase(),
+                    )
+                    return (
+                      <Button
+                        key={idx}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={alreadyAdded}
+                        onClick={() => handleOpenAddQual(item)}
+                        className={`text-xs h-7 px-2.5 rounded-full ${
+                          alreadyAdded ? 'opacity-40 cursor-not-allowed' : 'hover:border-primary/50'
+                        }`}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        {item.name}
+                      </Button>
+                    )
+                  })}
                 </div>
-                <Switch
-                  id="sw-cv-date"
-                  checked={showUpdatedAtInCv}
-                  onCheckedChange={async (chk) => {
-                    setShowUpdatedAtInCv(chk)
-                    await professionalCenterService.upsertProfile({ show_updated_at_in_cv: chk })
-                  }}
-                />
               </div>
 
-              {/* Seção 2.1: Experiências Profissionais */}
+              {/* Lista de Qualificações Cadastradas */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-heading flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5 text-primary" /> Experiências Profissionais (
-                    {experiences.length})
+                    <Award className="w-3.5 h-3.5 text-primary" /> Qualificações Cadastradas (
+                    {qualifications.length})
                   </h3>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleOpenAddExp}
-                    className="text-xs h-8 gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Adicionar Experiência
-                  </Button>
                 </div>
 
+                {qualifications.length === 0 ? (
+                  <div className="p-8 border border-dashed rounded-lg text-center space-y-2 bg-muted/10">
+                    <Award className="w-8 h-8 mx-auto text-muted-foreground opacity-60" />
+                    <p className="text-xs font-semibold text-foreground">
+                      Nenhuma qualificação cadastrada ainda
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                      Destaque conhecimentos práticos como operação de painel de LED, iluminação
+                      cênica, softwares de edição ou montagem de cenários.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => handleOpenAddQual()}
+                      className="text-xs mt-2"
+                    >
+                      Cadastrar Primeira Qualificação
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {qualifications.map((q, idx) => (
+                      <div
+                        key={q.id || idx}
+                        className="p-3 bg-muted/20 border border-border/60 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-foreground text-sm">{q.name}</span>
+                            {q.category && (
+                              <Badge variant="outline" className="text-[10px] py-0">
+                                {q.category}
+                              </Badge>
+                            )}
+                            {q.level && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] py-0 capitalize bg-primary/10 text-primary border-primary/20"
+                              >
+                                {q.level}
+                              </Badge>
+                            )}
+                            {q.years_experience && (
+                              <span className="text-[11px] text-muted-foreground">
+                                • {q.years_experience}
+                              </span>
+                            )}
+                          </div>
+
+                          {q.practical_description && (
+                            <p className="text-[11px] text-muted-foreground line-clamp-2">
+                              {q.practical_description}
+                            </p>
+                          )}
+
+                          <div className="flex items-center gap-3 text-[11px] pt-0.5">
+                            {q.certificate_url && (
+                              <a
+                                href={q.certificate_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary hover:underline flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-3 h-3" /> Certificado / Comprovante
+                              </a>
+                            )}
+                            {q.external_link && (
+                              <a
+                                href={q.external_link}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary hover:underline flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-3 h-3" /> Link do Projeto / Vídeo
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={idx === 0}
+                            onClick={() => handleMoveQual(idx, 'up')}
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            title="Mover para cima"
+                          >
+                            <MoveUp className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={idx === qualifications.length - 1}
+                            onClick={() => handleMoveQual(idx, 'down')}
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            title="Mover para baixo"
+                          >
+                            <MoveDown className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenEditQual(q)}
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteQual(q.id!)}
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ============================================================= */}
+        {/* ABA 3: ÚLTIMAS EMPRESAS ONDE FIZ FREELANCE */}
+        {/* ============================================================= */}
+        <TabsContent value="experiences" className="space-y-6">
+          <Card className="border-border/70 shadow-sm bg-card">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg font-serif">
+                  3. Últimas Empresas Onde Fiz Freelance
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Cadastre empresas ou clientes para os quais realizou trabalhos freelance, sem
+                  sugerir vínculo empregatício.
+                </CardDescription>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleOpenAddExp}
+                  className="text-xs gap-1.5 bg-primary"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Adicionar Freelance Realizado
+                </Button>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-5">
+              {/* Texto Informativo Obrigatório de Autorização */}
+              <div className="p-3.5 bg-primary/5 rounded-xl border border-primary/20 flex items-start gap-3 text-xs leading-relaxed">
+                <ShieldCheck className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-semibold text-foreground block">
+                    Aviso de Privacidade & Divulgação de Clientes
+                  </span>
+                  <p className="text-muted-foreground">
+                    "Informe empresas ou clientes para os quais você realizou trabalhos freelance.
+                    Só publique nomes com autorização ou quando a informação puder ser divulgada."
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Você tem total controle: cada empresa/cliente pode ser mantida visível ou oculta
+                    individualmente.
+                  </p>
+                </div>
+              </div>
+
+              {/* Lista de Experiências Freelance */}
+              <div className="space-y-3">
                 {experiences.length === 0 ? (
-                  <div className="p-4 border border-dashed rounded-lg text-center text-xs text-muted-foreground bg-muted/10">
-                    Nenhuma experiência cadastrada ainda. Clique em "Adicionar Experiência" para
-                    incluir clientes, produtoras ou empresas atendidas.
+                  <div className="p-8 border border-dashed rounded-lg text-center space-y-2 bg-muted/10">
+                    <Briefcase className="w-8 h-8 mx-auto text-muted-foreground opacity-60" />
+                    <p className="text-xs font-semibold text-foreground">
+                      Nenhuma experiência freelance cadastrada ainda
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                      Cadastre produtoras, agências, clientes finais ou eventos onde atuou como
+                      prestador autônomo.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleOpenAddExp}
+                      className="text-xs mt-2"
+                    >
+                      Cadastrar Primeira Experiência Freelance
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-2">
                     {experiences.map((exp) => (
                       <div
                         key={exp.id}
-                        className="p-3 bg-muted/20 border border-border/60 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                        className="p-3 bg-muted/20 border border-border/60 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                       >
                         <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-foreground">{exp.role}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-foreground text-sm">
+                              {exp.company_client}
+                            </span>
                             <span className="text-muted-foreground">•</span>
-                            <span className="text-primary font-medium">{exp.company_client}</span>
-                            {exp.current && (
-                              <Badge variant="outline" className="text-[10px] py-0">
-                                Atual
+                            <span className="text-primary font-medium">{exp.role}</span>
+                            {exp.show_in_public ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] py-0 text-emerald-600 border-emerald-500/30 bg-emerald-500/10"
+                              >
+                                Visível Publicamente
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] py-0 text-muted-foreground"
+                              >
+                                Oculto / Privado
                               </Badge>
                             )}
                           </div>
+
                           <p className="text-[11px] text-muted-foreground">
-                            {[exp.start_date, exp.current ? 'Atual' : exp.end_date]
+                            {[
+                              exp.period_or_year ||
+                                (exp.current
+                                  ? `${exp.start_date || ''} - Atual`
+                                  : [exp.start_date, exp.end_date].filter(Boolean).join(' - ')),
+                              exp.city_state || exp.location_or_mode,
+                              exp.service_type ? `Serviço: ${exp.service_type}` : '',
+                            ]
                               .filter(Boolean)
-                              .join(' - ')}
-                            {exp.location_or_mode ? ` • ${exp.location_or_mode}` : ''}
+                              .join(' • ')}
                           </p>
+
                           {exp.description && (
                             <p className="text-[11px] text-muted-foreground line-clamp-2">
                               {exp.description}
@@ -1535,29 +2038,23 @@ export default function Profile() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() =>
-                              professionalCenterService
-                                .updateExperience(exp.id!, { show_in_cv: !exp.show_in_cv })
-                                .then((updated) =>
-                                  setExperiences((prev) =>
-                                    prev.map((x) => (x.id === exp.id ? updated : x)),
-                                  ),
-                                )
-                            }
-                            className={`text-xs h-7 px-2 ${exp.show_in_cv ? 'text-primary' : 'text-muted-foreground'}`}
-                            title="Alternar no currículo"
+                            onClick={() => handleToggleExpPublic(exp)}
+                            className={`text-xs h-7 px-2.5 ${
+                              exp.show_in_public ? 'text-emerald-600' : 'text-muted-foreground'
+                            }`}
+                            title="Alternar visibilidade pública"
                           >
-                            {exp.show_in_cv ? (
+                            {exp.show_in_public ? (
                               <Eye className="w-3.5 h-3.5 mr-1" />
                             ) : (
                               <EyeOff className="w-3.5 h-3.5 mr-1" />
                             )}
-                            CV
+                            {exp.show_in_public ? 'Público' : 'Oculto'}
                           </Button>
 
                           <Button
@@ -1586,93 +2083,55 @@ export default function Profile() {
                 )}
               </div>
 
-              {/* Seção 2.2: Formação Acadêmica & Cursos */}
-              <div className="space-y-3 pt-2">
+              {/* Seção Cursos & Certificações Complementares */}
+              <div className="space-y-3 pt-4 border-t border-border/50">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-heading flex items-center gap-1.5">
-                    <GraduationCap className="w-3.5 h-3.5 text-primary" /> Formação Acadêmica &
-                    Certificações ({education.length})
+                    <GraduationCap className="w-3.5 h-3.5 text-primary" /> Cursos & Certificações
+                    Complementares ({education.length})
                   </h3>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={handleOpenAddEdu}
-                    className="text-xs h-8 gap-1"
+                    className="text-xs h-7 gap-1"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Adicionar Formação
+                    <Plus className="w-3 h-3" /> Adicionar Curso
                   </Button>
                 </div>
 
-                {education.length === 0 ? (
-                  <div className="p-4 border border-dashed rounded-lg text-center text-xs text-muted-foreground bg-muted/10">
-                    Nenhuma formação adicionada. Adicione graduações, cursos técnicos ou
-                    certificações relevantes.
-                  </div>
-                ) : (
+                {education.length > 0 && (
                   <div className="space-y-2">
                     {education.map((edu) => (
                       <div
                         key={edu.id}
-                        className="p-3 bg-muted/20 border border-border/60 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                        className="p-2.5 bg-muted/20 border border-border/60 rounded-lg flex items-center justify-between text-xs"
                       >
                         <div className="space-y-0.5">
                           <p className="font-semibold text-foreground">{edu.course_name}</p>
                           <p className="text-[11px] text-muted-foreground">
                             {edu.institution} {edu.period_or_year ? `• ${edu.period_or_year}` : ''}
                           </p>
-                          {edu.certificate_url && (
-                            <a
-                              href={edu.certificate_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[11px] text-primary underline block"
-                            >
-                              Ver certificado / comprovação
-                            </a>
-                          )}
                         </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              professionalCenterService
-                                .updateEducation(edu.id!, { show_in_cv: !edu.show_in_cv })
-                                .then((updated) =>
-                                  setEducation((prev) =>
-                                    prev.map((x) => (x.id === edu.id ? updated : x)),
-                                  ),
-                                )
-                            }
-                            className={`text-xs h-7 px-2 ${edu.show_in_cv ? 'text-primary' : 'text-muted-foreground'}`}
-                          >
-                            {edu.show_in_cv ? (
-                              <Eye className="w-3.5 h-3.5 mr-1" />
-                            ) : (
-                              <EyeOff className="w-3.5 h-3.5 mr-1" />
-                            )}
-                            CV
-                          </Button>
+                        <div className="flex items-center gap-1">
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             onClick={() => handleOpenEditEdu(edu)}
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
                           >
-                            <Edit2 className="w-3.5 h-3.5" />
+                            <Edit2 className="w-3 h-3" />
                           </Button>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDeleteEdu(edu.id!)}
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
                       </div>
@@ -1680,103 +2139,21 @@ export default function Profile() {
                   </div>
                 )}
               </div>
-
-              {/* Seção 2.3: Configuração e Reordenação de Blocos do Currículo */}
-              <div className="space-y-3 pt-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-heading flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-primary" /> Privacidade & Ordem dos Blocos no
-                  Currículo
-                </h3>
-                <p className="text-[11px] text-muted-foreground">
-                  Escolha exatamente quais blocos aparecem na impressão/PDF do seu currículo. Dados
-                  sensíveis como CPF e contas bancárias nunca são exibidos.
-                </p>
-
-                <div className="space-y-2">
-                  {resumeBlocks.map((block, idx) => (
-                    <div
-                      key={block.id}
-                      className="p-2.5 bg-muted/20 border border-border/50 rounded-lg flex items-center justify-between text-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 text-muted-foreground font-mono text-[11px]">
-                          #{idx + 1}
-                        </span>
-                        <span className="font-medium text-foreground">{block.title}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 mr-2">
-                          <Switch
-                            id={`sw-block-${block.id}`}
-                            checked={block.visibleInCv}
-                            onCheckedChange={() => handleToggleBlockCv(block.id)}
-                          />
-                          <Label
-                            htmlFor={`sw-block-${block.id}`}
-                            className="text-[11px] text-muted-foreground cursor-pointer"
-                          >
-                            {block.visibleInCv ? 'Exibir no CV' : 'Oculto'}
-                          </Label>
-                        </div>
-
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={idx === 0}
-                          onClick={() => handleMoveBlock(idx, 'up')}
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                          title="Mover para cima"
-                        >
-                          <MoveUp className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={idx === resumeBlocks.length - 1}
-                          onClick={() => handleMoveBlock(idx, 'down')}
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                          title="Mover para baixo"
-                        >
-                          <MoveDown className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </CardContent>
-
-            <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/40 pt-4">
-              <span className="text-xs text-muted-foreground">
-                Dica: O currículo em PDF é ideal para apresentar propostas de contratação formal.
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setPreviewModalOpen(true)}
-                className="w-full sm:w-auto text-xs gap-1.5"
-              >
-                <Eye className="w-3.5 h-3.5" /> Visualizar Folha A4
-              </Button>
-            </CardFooter>
           </Card>
         </TabsContent>
 
         {/* ============================================================= */}
-        {/* ABA 3: SERVIÇOS E ESPECIALIDADES */}
+        {/* ABA 4: SERVIÇOS OFERECIDOS */}
         {/* ============================================================= */}
         <TabsContent value="services" className="space-y-6">
           <Card className="border-border/70 shadow-sm bg-card">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <CardTitle className="text-lg font-serif">3. Serviços & Especialidades</CardTitle>
+                <CardTitle className="text-lg font-serif">4. Serviços Oferecidos</CardTitle>
                 <CardDescription className="text-xs">
-                  Cadastre seus serviços recorrentes. Eles aparecem como sugestão ao emitir novos
-                  orçamentos, agilizando seu fluxo de propostas.
+                  Cadastre os serviços e diárias que você oferece como freelancer. Eles são
+                  reutilizados automaticamente na criação de novos orçamentos.
                 </CardDescription>
               </div>
 
@@ -1798,8 +2175,8 @@ export default function Profile() {
                     Nenhum serviço cadastrado ainda
                   </p>
                   <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    Cadastre suas diárias de cobertura, pacotes de fotografia, projetos de design ou
-                    sonorização para reutilizar nos seus orçamentos.
+                    Cadastre suas diárias de cobertura, pacotes de fotografia, produção de streaming
+                    ou direção técnica para reutilizar nos seus orçamentos.
                   </p>
                   <Button
                     type="button"
@@ -1874,14 +2251,14 @@ export default function Profile() {
         </TabsContent>
 
         {/* ============================================================= */}
-        {/* ABA 4: EQUIPAMENTOS PARA LOCAÇÃO */}
+        {/* ABA 5: EQUIPAMENTOS PARA LOCAÇÃO */}
         {/* ============================================================= */}
         <TabsContent value="equipment" className="space-y-6">
           <Card className="border-border/70 shadow-sm bg-card">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <CardTitle className="text-lg font-serif">
-                  4. Meus Equipamentos para Locação
+                  5. Equipamentos Próprios Disponíveis para Locação
                 </CardTitle>
                 <CardDescription className="text-xs">
                   Controle seus equipamentos próprios, diárias de aluguel e integre-os diretamente
@@ -1907,8 +2284,8 @@ export default function Profile() {
                     Nenhum equipamento cadastrado
                   </p>
                   <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    Cadastre suas câmeras, kits de luz, áudio ou periféricos. Você pode definir se
-                    deseja oferecê-los em propostas ou locação avulsa.
+                    Cadastre suas câmeras, kits de iluminação, microfones ou painéis de LED para
+                    locação avulsa ou com operador técnico.
                   </p>
                   <Button
                     type="button"
@@ -1916,7 +2293,7 @@ export default function Profile() {
                     onClick={handleOpenAddEq}
                     className="text-xs mt-2"
                   >
-                    Cadastrar Rápido no Celular
+                    Cadastrar Equipamento
                   </Button>
                 </div>
               ) : (
@@ -2006,7 +2383,7 @@ export default function Profile() {
         </TabsContent>
 
         {/* ============================================================= */}
-        {/* ABA 5: APRESENTAÇÃO PÚBLICA (Fase 3 preview/planos pagos) */}
+        {/* ABA 6: PORTFÓLIO E APRESENTAÇÃO PÚBLICA */}
         {/* ============================================================= */}
         <TabsContent value="public_page" className="space-y-6">
           <Card className="border-border/70 shadow-sm bg-card overflow-hidden">
@@ -2016,32 +2393,36 @@ export default function Profile() {
                   <div className="flex items-center gap-2">
                     <Crown className="w-5 h-5 text-amber-500" />
                     <h3 className="text-lg font-serif font-bold text-foreground">
-                      Apresentação Pública & Mini-site Profissional
+                      Página Pública de Apresentação Profissional
                     </h3>
                   </div>
                   <p className="text-xs text-muted-foreground max-w-xl">
                     {user?.pilot_access ? (
                       <>
-                        Liberado para o seu usuário do <strong>Piloto Studio Freela</strong>. Você
-                        terá acesso prioritário ao mini-site e apresentação pública no endereço{' '}
-                        <code>studiofreela.com/p/seu-nome</code> com link para WhatsApp e QR Code.
+                        Liberado para o seu usuário do <strong>Piloto Studio Freela</strong>. Sua
+                        página pública exibe qualificações, serviços, experiências freelance
+                        autorizadas e contatos oficiais.
                       </>
                     ) : (
                       <>
-                        Recurso exclusivo para assinantes dos planos <strong>Intermediate</strong> e{' '}
-                        <strong>Advanced</strong>. Publique um mini-site elegante no endereço{' '}
-                        <code>studiofreela.com/p/seu-nome</code> com link para WhatsApp e QR Code
-                        exclusivo.
+                        Disponível nos planos pagos do Studio Freela. Apresente qualificações,
+                        experiências freelance, serviços, equipamentos e portfólio em um link limpo
+                        e profissional.
                       </>
                     )}
                   </p>
                 </div>
-                <Badge
-                  variant="outline"
-                  className="self-start sm:self-auto bg-amber-500/10 text-amber-600 border-amber-500/30"
-                >
-                  {user?.pilot_access ? 'Acesso Antecipado Piloto' : 'Próxima Rodada (Fase 3)'}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPreviewModalOpen(true)}
+                    className="text-xs gap-1.5"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> Ver Apresentação
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -2049,10 +2430,12 @@ export default function Profile() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                 <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-2">
                   <Globe className="w-5 h-5 text-primary" />
-                  <h4 className="font-semibold text-foreground text-sm">Link Único & Slug</h4>
+                  <h4 className="font-semibold text-foreground text-sm">
+                    Apresentação Estruturada
+                  </h4>
                   <p className="text-muted-foreground leading-relaxed">
-                    Compartilhe seu link profissional em redes sociais, bio do Instagram e cartões
-                    digitais.
+                    Mostre aos contratantes exatamente o que você faz: qualificações, equipamentos,
+                    serviços e cases práticos.
                   </p>
                 </div>
 
@@ -2060,47 +2443,92 @@ export default function Profile() {
                   <ShieldCheck className="w-5 h-5 text-emerald-600" />
                   <h4 className="font-semibold text-foreground text-sm">Privacidade Seletiva</h4>
                   <p className="text-muted-foreground leading-relaxed">
-                    Você escolhe individualmente quais serviços, equipamentos e experiências
-                    aparecem online.
+                    Você escolhe individualmente quais clientes, valores e telefones ficam visíveis
+                    na sua apresentação pública.
                   </p>
                 </div>
 
                 <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-2">
                   <Sparkles className="w-5 h-5 text-primary" />
-                  <h4 className="font-semibold text-foreground text-sm">Visual Studio Freela</h4>
+                  <h4 className="font-semibold text-foreground text-sm">Exportação em PDF</h4>
                   <p className="text-muted-foreground leading-relaxed">
-                    Design sóbrio, tipografia serifada e selo de prestador verificado Studio Freela.
+                    Gere documentos no formato padrão Studio Freela com tipografia sóbria e layout
+                    A4 impecável.
                   </p>
                 </div>
               </div>
 
-              <div className="p-4 bg-muted/40 rounded-xl border border-border/60 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="space-y-1 text-center sm:text-left">
-                  <span className="font-semibold text-xs text-foreground block">
-                    Gostaria de liberar sua página antes de todo mundo?
-                  </span>
-                  <p className="text-[11px] text-muted-foreground">
-                    Continue preenchendo seus dados profissionais e equipamentos para quando a Fase
-                    3 for lançada seu perfil já estar 100% pronto.
-                  </p>
-                </div>
+              {/* Ordem dos blocos na Apresentação */}
+              <div className="space-y-3 pt-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-heading flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-primary" /> Ordem & Visibilidade na
+                  Apresentação Profissional
+                </h3>
+                <p className="text-[11px] text-muted-foreground">
+                  Personalize quais seções aparecem no PDF e na visualização da apresentação.
+                </p>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setActiveTab('personal')}
-                  className="text-xs shrink-0"
-                >
-                  Continuar Preenchendo Perfil
-                </Button>
+                <div className="space-y-2">
+                  {resumeBlocks.map((block, idx) => (
+                    <div
+                      key={block.id}
+                      className="p-2.5 bg-muted/20 border border-border/50 rounded-lg flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 text-muted-foreground font-mono text-[11px]">
+                          #{idx + 1}
+                        </span>
+                        <span className="font-medium text-foreground">{block.title}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 mr-2">
+                          <Switch
+                            id={`sw-block-${block.id}`}
+                            checked={block.visibleInCv}
+                            onCheckedChange={() => handleToggleBlockCv(block.id)}
+                          />
+                          <Label
+                            htmlFor={`sw-block-${block.id}`}
+                            className="text-[11px] text-muted-foreground cursor-pointer"
+                          >
+                            {block.visibleInCv ? 'Visível' : 'Oculto'}
+                          </Label>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={idx === 0}
+                          onClick={() => handleMoveBlock(idx, 'up')}
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          title="Mover para cima"
+                        >
+                          <MoveUp className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={idx === resumeBlocks.length - 1}
+                          onClick={() => handleMoveBlock(idx, 'down')}
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          title="Mover para baixo"
+                        >
+                          <MoveDown className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* ============================================================= */}
-        {/* ABA SEGURANÇA E LGPD */}
+        {/* ABA 7: SEGURANÇA E PRIVACIDADE LGPD */}
         {/* ============================================================= */}
         <TabsContent value="security" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2187,7 +2615,9 @@ export default function Profile() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-primary" />
-                  <CardTitle className="text-base font-serif">Meus Dados (LGPD)</CardTitle>
+                  <CardTitle className="text-base font-serif">
+                    Privacidade & Meus Dados (LGPD)
+                  </CardTitle>
                 </div>
                 <CardDescription className="text-xs">
                   Em conformidade com a Lei Geral de Proteção de Dados (Lei 13.709/2018).
@@ -2195,8 +2625,8 @@ export default function Profile() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Você tem o direito de portabilidade e esquecimento a qualquer momento. Seus dados
-                  cadastrados nunca são compartilhados publicamente sem sua autorização expressa.
+                  Você escolhe quais dados serão públicos. Informações como CPF, CNPJ, telefone,
+                  e-mail ou endereço nunca são exibidas publicamente sem a sua expressa permissão.
                 </p>
 
                 <div className="space-y-2">
@@ -2243,34 +2673,26 @@ export default function Profile() {
       </Tabs>
 
       {/* ============================================================= */}
-      {/* DIALOG: EXPERIÊNCIA PROFISSIONAL */}
+      {/* DIALOG: QUALIFICAÇÕES E CONHECIMENTOS ESPECÍFICOS */}
       {/* ============================================================= */}
-      <Dialog open={expDialogOpen} onOpenChange={setExpDialogOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog open={qualDialogOpen} onOpenChange={setQualDialogOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif text-base">
-              {editingExp ? 'Editar Experiência' : 'Adicionar Experiência Profissional'}
+              {editingQual ? 'Editar Qualificação' : 'Cadastrar Qualificação ou Conhecimento'}
             </DialogTitle>
+            <DialogDescription className="text-xs">
+              Informe a experiência prática, nível técnico e área de conhecimento específico.
+            </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSaveExp} className="space-y-3 text-xs">
+          <form onSubmit={handleSaveQual} className="space-y-3.5 text-xs">
             <div className="space-y-1">
-              <Label className="text-xs">Empresa ou Cliente Atendido *</Label>
+              <Label className="text-xs font-medium">Nome da Qualificação ou Conhecimento *</Label>
               <Input
-                value={expCompany}
-                onChange={(e) => setExpCompany(e.target.value)}
-                placeholder="Ex: Produtora Cine & Vídeo / Eventos XP"
-                required
-                className="text-xs h-9"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Função / Cargo *</Label>
-              <Input
-                value={expRole}
-                onChange={(e) => setExpRole(e.target.value)}
-                placeholder="Ex: Diretor de Fotografia / Editor Chefe"
+                value={qualName}
+                onChange={(e) => setQualName(e.target.value)}
+                placeholder="Ex: Operação de painel de LED / Sonorização"
                 required
                 className="text-xs h-9"
               />
@@ -2278,66 +2700,203 @@ export default function Profile() {
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <Label className="text-xs">Período Inicial</Label>
+                <Label className="text-xs font-medium">Categoria</Label>
                 <Input
-                  value={expStart}
-                  onChange={(e) => setExpStart(e.target.value)}
-                  placeholder="Ex: Jan/2022"
+                  value={qualCategory}
+                  onChange={(e) => setQualCategory(e.target.value)}
+                  placeholder="Ex: Vídeo, Áudio, Softwares"
                   className="text-xs h-9"
                 />
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs">Período Final</Label>
-                <Input
-                  value={expEnd}
-                  disabled={expCurrent}
-                  onChange={(e) => setExpEnd(e.target.value)}
-                  placeholder={expCurrent ? 'Atual' : 'Ex: Dez/2023'}
-                  className="text-xs h-9"
-                />
+                <Label className="text-xs font-medium">Nível de Domínio</Label>
+                <Select value={qualLevel} onValueChange={(val: any) => setQualLevel(val)}>
+                  <SelectTrigger className="text-xs h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="basico">Básico</SelectItem>
+                    <SelectItem value="intermediario">Intermediário</SelectItem>
+                    <SelectItem value="avancado">Avançado</SelectItem>
+                    <SelectItem value="especialista">Especialista</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Switch checked={expCurrent} onCheckedChange={setExpCurrent} id="sw-exp-cur" />
-              <Label htmlFor="sw-exp-cur" className="text-xs cursor-pointer">
-                Trabalho atual / em andamento
-              </Label>
-            </div>
-
             <div className="space-y-1">
-              <Label className="text-xs">Cidade ou Modalidade</Label>
+              <Label className="text-xs">Tempo de Experiência (Opcional)</Label>
               <Input
-                value={expLocation}
-                onChange={(e) => setExpLocation(e.target.value)}
-                placeholder="Ex: São Paulo / Remoto"
+                value={qualYearsExp}
+                onChange={(e) => setQualYearsExp(e.target.value)}
+                placeholder="Ex: 4 anos em eventos de grande porte"
                 className="text-xs h-9"
               />
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs">Descrição das Atividades</Label>
+              <Label className="text-xs">Descrição Prática / Equipamentos Utilizados</Label>
               <Textarea
-                value={expDesc}
-                onChange={(e) => setExpDesc(e.target.value)}
-                placeholder="Principais responsabilidades desempenhadas..."
+                value={qualDesc}
+                onChange={(e) => setQualDesc(e.target.value)}
+                placeholder="Ex: Montagem, configuração de processadores Novastar e alinhamento de gabinetes P3/P2."
                 className="text-xs min-h-[70px] resize-none"
               />
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs">Resultados / Projetos Relevantes</Label>
+              <Label className="text-xs">Certificado ou Comprovante (Link opcional)</Label>
               <Input
-                value={expResults}
-                onChange={(e) => setExpResults(e.target.value)}
-                placeholder="Ex: Cobertura de congresso com 2.000 participantes"
+                value={qualCertUrl}
+                onChange={(e) => setQualCertUrl(e.target.value)}
+                placeholder="https://drive.google.com/..."
+                className="text-xs h-9"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Link Externo / Portfólio do Conhecimento (Opcional)</Label>
+              <Input
+                value={qualExtLink}
+                onChange={(e) => setQualExtLink(e.target.value)}
+                placeholder="https://vimeo.com/... ou https://instagram.com/..."
                 className="text-xs h-9"
               />
             </div>
 
             <div className="p-2.5 bg-muted/40 rounded-lg border border-border/50 flex items-center justify-between">
-              <Label className="text-xs">Exibir no Currículo Impresso/PDF</Label>
+              <div className="space-y-0.5">
+                <Label className="text-xs">Exibir na Apresentação Profissional (PDF)</Label>
+                <p className="text-[10px] text-muted-foreground">
+                  Inclui esta qualificação no documento oficial gerado para contratantes.
+                </p>
+              </div>
+              <Switch checked={qualShowCv} onCheckedChange={setQualShowCv} />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setQualDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" size="sm" className="bg-primary">
+                Salvar Qualificação
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============================================================= */}
+      {/* DIALOG: ÚLTIMAS EMPRESAS ONDE FIZ FREELANCE */}
+      {/* ============================================================= */}
+      <Dialog open={expDialogOpen} onOpenChange={setExpDialogOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-base">
+              {editingExp
+                ? 'Editar Empresa Onde Fiz Freelance'
+                : 'Cadastrar Empresa Onde Fiz Freelance'}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Informe clientes ou produtoras atendidas. Por padrão, a informação inicia privada.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveExp} className="space-y-3.5 text-xs">
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">Nome da Empresa ou Cliente *</Label>
+              <Input
+                value={expCompany}
+                onChange={(e) => setExpCompany(e.target.value)}
+                placeholder="Ex: Agência Live / Produtora Frame / Evento XP"
+                required
+                className="text-xs h-9"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">Função Exercida no Freelance *</Label>
+              <Input
+                value={expRole}
+                onChange={(e) => setExpRole(e.target.value)}
+                placeholder="Ex: Operador de Câmera / Diretor Técnico / Iluminador"
+                required
+                className="text-xs h-9"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Tipo de Serviço Realizado</Label>
+                <Input
+                  value={expServiceType}
+                  onChange={(e) => setExpServiceType(e.target.value)}
+                  placeholder="Ex: Cobertura ao vivo"
+                  className="text-xs h-9"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Período ou Ano do Trabalho</Label>
+                <Input
+                  value={expPeriodOrYear}
+                  onChange={(e) => setExpPeriodOrYear(e.target.value)}
+                  placeholder="Ex: Nov/2023 ou 2024"
+                  className="text-xs h-9"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Cidade e Estado (Opcional)</Label>
+              <Input
+                value={expCityState}
+                onChange={(e) => setExpCityState(e.target.value)}
+                placeholder="Ex: São Paulo - SP"
+                className="text-xs h-9"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Breve Descrição do Projeto / Escopo</Label>
+              <Textarea
+                value={expDesc}
+                onChange={(e) => setExpDesc(e.target.value)}
+                placeholder="Descreva brevemente as entregas e porte do evento/projeto..."
+                className="text-xs min-h-[70px] resize-none"
+              />
+            </div>
+
+            {/* Opção individual de exibição pública */}
+            <div className="p-3 bg-muted/40 rounded-xl border border-border/50 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label
+                    htmlFor="sw-exp-pub"
+                    className="text-xs font-semibold cursor-pointer block"
+                  >
+                    Exibir Empresa / Cliente Publicamente
+                  </Label>
+                  <p className="text-[10px] text-muted-foreground">
+                    "Só publique nomes com autorização ou quando a informação puder ser divulgada."
+                  </p>
+                </div>
+                <Switch
+                  id="sw-exp-pub"
+                  checked={expShowPublic}
+                  onCheckedChange={setExpShowPublic}
+                />
+              </div>
+            </div>
+
+            <div className="p-2.5 bg-muted/20 rounded-lg border border-border/40 flex items-center justify-between">
+              <Label className="text-xs">Exibir na Apresentação Profissional (PDF)</Label>
               <Switch checked={expShowCv} onCheckedChange={setExpShowCv} />
             </div>
 
@@ -2351,7 +2910,7 @@ export default function Profile() {
                 Cancelar
               </Button>
               <Button type="submit" size="sm" className="bg-primary">
-                Salvar Experiência
+                Salvar Freelance Realizado
               </Button>
             </DialogFooter>
           </form>
@@ -2365,7 +2924,7 @@ export default function Profile() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="font-serif text-base">
-              {editingEdu ? 'Editar Formação' : 'Adicionar Formação ou Curso'}
+              {editingEdu ? 'Editar Curso' : 'Adicionar Curso ou Certificação'}
             </DialogTitle>
           </DialogHeader>
 
@@ -2375,7 +2934,7 @@ export default function Profile() {
               <Input
                 value={eduInst}
                 onChange={(e) => setEduInst(e.target.value)}
-                placeholder="Ex: ESPM, SENAC, Panamericana"
+                placeholder="Ex: SENAC, Academia do Áudio, Panamericana"
                 required
                 className="text-xs h-9"
               />
@@ -2386,7 +2945,7 @@ export default function Profile() {
               <Input
                 value={eduCourse}
                 onChange={(e) => setEduCourse(e.target.value)}
-                placeholder="Ex: Produção Audiovisual Avançada"
+                placeholder="Ex: Operação Técnica de Iluminação"
                 required
                 className="text-xs h-9"
               />
@@ -2398,7 +2957,7 @@ export default function Profile() {
                 <Input
                   value={eduPeriod}
                   onChange={(e) => setEduPeriod(e.target.value)}
-                  placeholder="Ex: 2020 - 2024"
+                  placeholder="Ex: 2023"
                   className="text-xs h-9"
                 />
               </div>
@@ -2410,10 +2969,10 @@ export default function Profile() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="graduacao">Graduação</SelectItem>
-                    <SelectItem value="pos_graduacao">Pós-Graduação</SelectItem>
                     <SelectItem value="curso_livre">Curso Livre</SelectItem>
                     <SelectItem value="certificacao">Certificação</SelectItem>
+                    <SelectItem value="graduacao">Graduação</SelectItem>
+                    <SelectItem value="pos_graduacao">Pós-Graduação</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2430,7 +2989,7 @@ export default function Profile() {
             </div>
 
             <div className="p-2.5 bg-muted/40 rounded-lg border border-border/50 flex items-center justify-between">
-              <Label className="text-xs">Exibir no Currículo Impresso/PDF</Label>
+              <Label className="text-xs">Exibir na Apresentação (PDF)</Label>
               <Switch checked={eduShowCv} onCheckedChange={setEduShowCv} />
             </div>
 
@@ -2444,7 +3003,7 @@ export default function Profile() {
                 Cancelar
               </Button>
               <Button type="submit" size="sm" className="bg-primary">
-                Salvar Formação
+                Salvar Curso
               </Button>
             </DialogFooter>
           </form>
@@ -2458,7 +3017,7 @@ export default function Profile() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="font-serif text-base">
-              {editingSrv ? 'Editar Serviço' : 'Cadastrar Serviço ou Especialidade'}
+              {editingSrv ? 'Editar Serviço' : 'Cadastrar Serviço Oferecido'}
             </DialogTitle>
           </DialogHeader>
 
@@ -2468,18 +3027,18 @@ export default function Profile() {
               <Input
                 value={srvName}
                 onChange={(e) => setSrvName(e.target.value)}
-                placeholder="Ex: Cobertura Fotográfica de Evento"
+                placeholder="Ex: Diária de Operação Técnica"
                 required
                 className="text-xs h-9"
               />
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs">Descrição Curta</Label>
+              <Label className="text-xs">Descrição dos Serviços</Label>
               <Textarea
                 value={srvDesc}
                 onChange={(e) => setSrvDesc(e.target.value)}
-                placeholder="O que está incluso nesta entrega..."
+                placeholder="O que está incluso nesta entrega, escopo de atendimento..."
                 className="text-xs min-h-[60px] resize-none"
               />
             </div>
@@ -2527,7 +3086,7 @@ export default function Profile() {
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <Label className="text-xs">Preço Inicial (R$ - opcional)</Label>
+                <Label className="text-xs">Valor de Referência (R$ - opcional)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -2540,11 +3099,11 @@ export default function Profile() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs">Ou Faixa de Preço (opcional)</Label>
+                <Label className="text-xs">Ou "Sob Consulta" / Faixa</Label>
                 <Input
                   value={srvPriceRange}
                   onChange={(e) => setSrvPriceRange(e.target.value)}
-                  placeholder="Ex: R$ 1.500 - R$ 3.000"
+                  placeholder="Sob consulta ou R$ 1.200 - R$ 2.500"
                   className="text-xs h-9"
                 />
               </div>
@@ -2584,7 +3143,6 @@ export default function Profile() {
           </DialogHeader>
 
           <form onSubmit={handleSaveEq} className="space-y-3.5 text-xs">
-            {/* Campos Essenciais Rápidos */}
             <div className="p-3 bg-muted/30 rounded-xl border border-border/60 space-y-2.5">
               <span className="font-semibold text-primary uppercase text-[10px] tracking-wider block">
                 Cadastro Rápido (Essencial)
@@ -2595,7 +3153,7 @@ export default function Profile() {
                 <Input
                   value={eqName}
                   onChange={(e) => setEqName(e.target.value)}
-                  placeholder="Ex: Câmera Sony FX3 + Cage SmallRig"
+                  placeholder="Ex: Console Digital Yamaha / Câmera Cinema"
                   required
                   className="text-xs h-9"
                 />
@@ -2631,7 +3189,6 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* Integração Comercial com Orçamentos */}
             <div className="p-3 bg-primary/5 rounded-xl border border-primary/20 space-y-1.5">
               <div className="flex items-center justify-between">
                 <div>
@@ -2639,8 +3196,7 @@ export default function Profile() {
                     Oferecer este equipamento nos orçamentos
                   </Label>
                   <p className="text-[11px] text-muted-foreground">
-                    Aparecerá automaticamente como sugestão rápida ao adicionar equipamentos em uma
-                    proposta.
+                    Aparecerá automaticamente como sugestão rápida ao adicionar itens em orçamentos.
                   </p>
                 </div>
                 <Switch
@@ -2651,12 +3207,7 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* Complementos (Pode preencher depois) */}
             <div className="space-y-2.5 pt-1">
-              <span className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider block">
-                Detalhes & Valores (Opcionais)
-              </span>
-
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-xs">Categoria</Label>
@@ -2675,8 +3226,6 @@ export default function Profile() {
                       <SelectItem value="computadores">Computadores / Macs</SelectItem>
                       <SelectItem value="estruturas">Estruturas</SelectItem>
                       <SelectItem value="cenografia">Cenografia</SelectItem>
-                      <SelectItem value="moveis_acessorios">Móveis & Acessórios</SelectItem>
-                      <SelectItem value="cabos_perifericos">Cabos & Periféricos</SelectItem>
                       <SelectItem value="outros">Outros</SelectItem>
                     </SelectContent>
                   </Select>
@@ -2704,7 +3253,7 @@ export default function Profile() {
                   <Input
                     value={eqBrand}
                     onChange={(e) => setEqBrand(e.target.value)}
-                    placeholder="Ex: Sony"
+                    placeholder="Ex: Sony / Shure"
                     className="text-xs h-9"
                   />
                 </div>
@@ -2713,7 +3262,7 @@ export default function Profile() {
                   <Input
                     value={eqModel}
                     onChange={(e) => setEqModel(e.target.value)}
-                    placeholder="Ex: FX3 Cinema Line"
+                    placeholder="Ex: FX3 / ULXD4"
                     className="text-xs h-9"
                   />
                 </div>
@@ -2765,18 +3314,8 @@ export default function Profile() {
                 <Textarea
                   value={eqDesc}
                   onChange={(e) => setEqDesc(e.target.value)}
-                  placeholder="Ex: Acompanha 2 baterias NP-FZ100, carregador duplo e cartão V90 128GB."
+                  placeholder="Ex: Case rígido, cabeamento balanceado e acessórios completos."
                   className="text-xs min-h-[60px] resize-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs">Caução ou Observação Comercial</Label>
-                <Input
-                  value={eqDeposit}
-                  onChange={(e) => setEqDeposit(e.target.value)}
-                  placeholder="Ex: Exige termo de responsabilidade e caução de 20%"
-                  className="text-xs h-9"
                 />
               </div>
 
@@ -2806,7 +3345,7 @@ export default function Profile() {
       </Dialog>
 
       {/* ============================================================= */}
-      {/* MODAL DE PRÉVIA DO CURRÍCULO PROFISSIONAL */}
+      {/* MODAL DE PRÉVIA DA APRESENTAÇÃO PROFISSIONAL */}
       {/* ============================================================= */}
       <ResumePreviewModal
         open={previewModalOpen}
@@ -2817,14 +3356,15 @@ export default function Profile() {
         education={education}
         services={services}
         equipment={equipment}
+        qualifications={qualifications}
         theme={pdfTheme}
         onThemeChange={setPdfTheme}
       />
 
-      {/* Modal de Gestão de Planos & Assinatura Asaas */}
+      {/* Modal de Gestão de Planos & Assinatura */}
       <SubscriptionPlanModal open={planModalOpen} onOpenChange={setPlanModalOpen} />
 
-      {/* Dialog confirmação dupla exclusão de conta */}
+      {/* Dialog confirmação de exclusão */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -2834,8 +3374,8 @@ export default function Profile() {
             <AlertDialogDescription className="space-y-3 text-xs leading-relaxed">
               <p>
                 Esta ação é <strong className="text-destructive">permanente e irreversível</strong>.
-                Todos os seus dados pessoais, clientes cadastrados, contratos, orçamentos, títulos
-                financeiros e equipamentos serão eliminados do banco de dados.
+                Todos os seus dados de apresentação profissional, qualificações, propostas e
+                clientes serão eliminados.
               </p>
               <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-foreground">
                 <Label htmlFor="confirm-del-input" className="text-xs font-semibold block mb-1">
